@@ -2,7 +2,7 @@ Default: &defaults
   host: "*4" # any IPv4 host
   # note that devel port is always 3000
   port: 8496
-  approot: "http://localhost:8496"
+  approot: "http://ec2-54-250-187-247.ap-northeast-1.compute.amazonaws.com:8496"
   copyright: Insert copyright statement here
   #analytics: UA-YOURCODE
 
