@@ -1,0 +1,4 @@
+<h1>You've just posted
+<p>#{postedText}#{Text.reverse postedText}
+<hr>
+<p><a href=@{SubmitR}>Get back</a>
