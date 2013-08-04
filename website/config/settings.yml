@@ -1,5 +1,6 @@
 Default: &defaults
   host: "*4" # any IPv4 host
+  # note that devel port is always 3000
   port: 8496
   approot: "http://localhost:8496"
   copyright: Insert copyright statement here
