@@ -19,7 +19,7 @@ getHomeR = do
     maid <- maybeAuthId
     defaultLayout $ do
         aDomId <- newIdent
-        setTitle "Welcome To Yesod!"
+        setTitle "Welcome to our site!"
         $(widgetFile "homepage")
         $(widgetFile "auth-test")
 
@@ -34,7 +34,7 @@ postHomeR = do
 
     defaultLayout $ do
         aDomId <- newIdent
-        setTitle "Welcome To Yesod!"
+        setTitle "Welcome to our site!"
         $(widgetFile "homepage")
 
 sampleForm :: Form (FileInfo, Text)

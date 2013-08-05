@@ -12,7 +12,8 @@ Flag library-only
     Default:       False
 
 library
-    exposed-modules: Application
+    exposed-modules: App
+                     Application
                      Foundation
                      Import
                      Model
@@ -77,6 +78,8 @@ library
                  , mtl
                  , lens >= 3.9.0.2
                  , time
+                 , safe
+                 , MissingH
 
 executable         website
     if flag(library-only)
