@@ -98,6 +98,23 @@ instance Yesod App where
     -- The page to be redirected to when authentication is required.
     authRoute _ = Just $ AuthR LoginR
 
+    -- Authorization management.
+    isAuthorized HomeR _     = return Authorized
+    isAuthorized (AuthR _) _ = return Authorized
+    isAuthorized _ _         = do
+      let members =
+              [ "muranushi@gmail.com"
+              , "tanaka.hideyuki@gmail.com"
+              , "gusmachine@gmail.com"
+              , "fumiexcel@gmail.com" ]
+
+      mu <- maybeAuthId
+      return $ case mu of
+        Just x -> if x `elem` members then Authorized else AuthenticationRequired
+        _      -> AuthenticationRequired
+
+
+
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows
     -- expiration dates to be set far in the future without worry of
@@ -119,6 +136,7 @@ instance Yesod App where
         development || level == LevelWarn || level == LevelError
 
     makeLogger = return . appLogger
+
 
 -- How to run database actions.
 instance YesodPersist App where
