@@ -6,3 +6,4 @@
 <img src="static/img/umi.png" width=32>
 <img src="static/img/azunyan.jpg" width=32>
 <p><a href=@{SubmitR}>Get back</a>
+<p><a href=@{HomeR}>Go to top</a>

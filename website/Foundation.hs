@@ -1,10 +1,11 @@
+{-# LANGUAGE TupleSections #-}
 module Foundation where
 
 import Prelude
+import Data.Text (Text)
 import Yesod
 import Yesod.Static
 import Yesod.Auth
-import Yesod.Auth.BrowserId
 import Yesod.Auth.GoogleEmail
 import Yesod.Default.Config
 import Yesod.Default.Util (addStaticContentExternal)
@@ -127,24 +128,29 @@ instance YesodPersistRunner App where
     getDBRunner = defaultGetDBRunner connPool
 
 instance YesodAuth App where
-    type AuthId App = UserId
+    type AuthId App = Text -- UserId
 
     -- Where to send a user after successful login
-    loginDest _ = HomeR
+    loginDest _ = SubmitR
     -- Where to send a user after logout
     logoutDest _ = HomeR
 
+    getAuthId = return . Just . credsIdent
+{-
     getAuthId creds = runDB $ do
         x <- getBy $ UniqueUser $ credsIdent creds
         case x of
             Just (Entity uid _) -> return $ Just uid
             Nothing -> do
                 fmap Just $ insert $ User (credsIdent creds) Nothing
-
+-}
     -- You can add other plugins like BrowserID, email or OAuth here
-    authPlugins _ = [authBrowserId def, authGoogleEmail]
+    authPlugins _ = [authGoogleEmail]
 
     authHttpManager = httpManager
+
+    maybeAuthId = lookupSession "_ID"
+
 
 -- This instance is required to use forms. You can modify renderMessage to
 -- achieve customized and internationalized form validation messages.
