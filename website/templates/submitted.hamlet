@@ -1,5 +1,5 @@
 <h1>You've just posted
-<p>#{postedText}#{Text.reverse postedText}
+<p>#{postedText}
 <hr>
 <img src=@{StaticR img_megahomu_png} width=32>
 <img src=@{StaticR img_birds_gif} width=32>
