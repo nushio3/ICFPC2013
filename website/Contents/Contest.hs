@@ -36,7 +36,11 @@ renderSubmission sub = do
   let ownerMem :: TeamMember
       ownerMem = sub ^. ownerAuth . authMember
       rico = ownerMem ^. renderIcon $ 32
-      subi = sub ^. commitId
+      subi0 = sub ^. commitId
+      subi 
+        | Text.length subi0 > 60 = Text.take 60 subi0 <> "..."
+        | otherwise              = subi0
+
       sco  = maybe (0::Double) (fromRational) $ sub ^. score
       tims = takeWhile (/= '.')$ show $ sub ^. submittedTime
       tdIco  = [whamlet| <td> ^{ rico } |]
