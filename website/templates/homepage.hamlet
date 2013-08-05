@@ -1,0 +1,6 @@
+<center>
+  <h1> Top Page 
+  <p>
+  <p><img src="static/img/funny-doll.png">
+  <p>
+  <p><a href=@{SubmitR}>Go to submit page</a>
