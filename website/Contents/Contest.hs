@@ -80,7 +80,7 @@ teamMembers =
   , TeamMember "tanakh" "tanaka.hideyuki@gmail.com"
     (\size -> [whamlet| <img src=@{StaticR img_azunyan_jpg} width=#{size}> |] )
   , TeamMember "gusmachine" "gusmachine@gmail.com"
-    (\size -> [whamlet| <img src=@{StaticR img_umi_png} width=#{size}> |] )
+    (\size -> [whamlet| <img src=@{StaticR img_celestia_png} width=#{size}> |] )
   , TeamMember "fumieval" "fumiexcel@gmail.com" 
     (\size -> [whamlet| <img src=@{StaticR img_birds_gif} width=#{size}> |] )
   ]
