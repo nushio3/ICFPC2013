@@ -46,7 +46,7 @@ renderSubmission sub = do
       tdSco =  [whamlet| <td align="right"> #{ sco } |]
 
       tds :: WidgetT App IO () 
-      tds = foldl1 (>>) [tdIco , tdTims, tdComi, tdSco]    
+      tds = foldr (>>) (return ()) $ [tdIco , tdTims, tdComi, tdSco]    
 
   [whamlet| <tr> ^{tds} |]
 

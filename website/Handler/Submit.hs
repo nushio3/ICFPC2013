@@ -41,11 +41,11 @@ getSubmitR = do
     forM_ teamMembers (\mem -> mem ^. renderIcon $ 64)
 
     [whamlet| <h2> Best Submissions |]
-    let rows = foldl1 (>>) $ map renderSubmission bestSubs 
+    let rows = foldr (>>) (return ()) $ map renderSubmission bestSubs 
     [whamlet| <table cellpadding=3> ^{scoreTableHeader} ^{rows} |]
 
     [whamlet| <h2> Recent Submissions |]
-    let rows = foldl1 (>>) $ map renderSubmission recentSubs 
+    let rows = foldr (>>) (return ()) $ map renderSubmission recentSubs 
     [whamlet| <table cellpadding=3> ^{scoreTableHeader} ^{rows} |]
 
   where
