@@ -1,6 +1,9 @@
-all: deploy
+all: devel
 
-.PHONY: deploy
+.PHONY: deploy devel
+
+devel:
+	./dist/build/website/website Development
 
 deploy:
 	git pull

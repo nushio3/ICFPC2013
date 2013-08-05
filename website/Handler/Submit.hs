@@ -17,6 +17,9 @@ postSubmitR :: Handler Html
 postSubmitR = do
   maid <- maybeAuthId
   postedText <- runInputPost $ ireq textField "content"
+ 
+  () <- runDB $ return ()
+
   liftIO $ do
     hPutStrLn stderr (show postedText)
   defaultLayout $ do
