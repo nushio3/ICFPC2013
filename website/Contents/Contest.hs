@@ -1,0 +1,2 @@
+module Contents.Contest where
+

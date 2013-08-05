@@ -21,6 +21,7 @@ library
                      Settings.Development
                      Handler.Home
                      Handler.Submit
+                     Contents.Contest
 
     if flag(dev) || flag(library-only)
         cpp-options:   -DDEVELOPMENT
@@ -71,6 +72,9 @@ library
                  , conduit                       >= 1.0
                  , monad-logger                  >= 0.3
                  , fast-logger                   >= 0.3
+
+                 , transformers
+                 , mtl
 
 executable         website
     if flag(library-only)
