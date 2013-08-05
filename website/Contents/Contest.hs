@@ -7,7 +7,6 @@ import           Control.Lens.TH (makeLenses, makeLensesFor)
 import           Control.Monad
 import qualified Data.Text as Text
 import           Safe (headMay)
-import           Data.Hash.MD5 (md5i, Str)
 
 ----------------------------------------------------------------
 -- Types and Lenses for concepts in the contest.
@@ -39,28 +38,18 @@ renderSubmission sub = do
       rico = ownerMem ^. renderIcon $ 32
       subi = sub ^. commitId
       sco  = maybe (0::Double) (fromRational) $ sub ^. score
+      tims = takeWhile (/= '.')$ show $ sub ^. submittedTime
       tdIco  = [whamlet| <td> ^{ rico } |]
       tdComi = [whamlet| <td> #{ subi } |]
+      tdTims = [whamlet| <td> #{ tims } |]
 
       tdSco =  [whamlet| <td align="right"> #{ sco } |]
 
       tds :: WidgetT App IO () 
-      tds = foldl1 (>>) [tdIco , tdComi, tdSco]    
+      tds = foldl1 (>>) [tdIco , tdTims, tdComi, tdSco]    
 
   [whamlet| <tr> ^{tds} |]
 
---   
---
---       
---
--- 
---       let 
-  
-
---  
-
-
---  
   
 
 ----------------------------------------------------------------
