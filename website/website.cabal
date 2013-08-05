@@ -76,6 +76,7 @@ library
                  , transformers
                  , mtl
                  , lens >= 3.9.0.2
+                 , time
 
 executable         website
     if flag(library-only)
