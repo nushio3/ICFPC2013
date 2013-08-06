@@ -1,12 +1,26 @@
 User
-    ident Text
-    password Text Maybe
-    UniqueUser ident
-    deriving Typeable
-Email
-    email Text
-    user UserId Maybe
-    verkey Text Maybe
-    UniqueEmail email
+    m_ident      Text
+    m_password   Text Maybe
 
- -- By default this file is used in Model.hs (which is imported by Foundation.hs)
+    UniqueUser m_ident
+    deriving Typeable
+
+Email
+    m_email    Text
+    m_user     UserId Maybe
+    m_verkey   Text Maybe
+
+    UniqueEmail m_email
+
+
+Submission
+    m_commitId     Text
+    m_ownerAuth    Text Maybe
+    m_time         UTCTime
+    m_score        Rational Maybe
+
+    UniqueSubmission m_commitId
+    deriving Show Typeable
+
+-- Prefix all members by 'm_' so that we can create lenses for the default names.
+-- By default this file is used in Model.hs (which is imported by Foundation.hs)

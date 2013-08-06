@@ -1,0 +1,7 @@
+$maybe jmaid <- maid
+    <p>
+       You are currently logged in as: #{show jmaid} . 
+       <a href=@{AuthR LogoutR}>Logout</a>
+$nothing
+    <p>
+        <a href=@{AuthR LoginR}>Go to the login page</a>

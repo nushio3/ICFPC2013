@@ -1,10 +1,11 @@
+{-# LANGUAGE TupleSections #-}
 module Foundation where
 
 import Prelude
+import Data.Text (Text)
 import Yesod
 import Yesod.Static
 import Yesod.Auth
-import Yesod.Auth.BrowserId
 import Yesod.Auth.GoogleEmail
 import Yesod.Default.Config
 import Yesod.Default.Util (addStaticContentExternal)
@@ -20,10 +21,14 @@ import Text.Jasmine (minifym)
 import Text.Hamlet (hamletFile)
 import System.Log.FastLogger (Logger)
 
+import Control.Lens ((^.))
+
+
 -- | The site argument for your application. This can be a good place to
 -- keep settings and values requiring initialization before your application
 -- starts running, such as database connections. Every handler will have
 -- access to the data present here.
+
 data App = App
     { settings :: AppConfig DefaultEnv Extra
     , getStatic :: Static -- ^ Settings for static file serving.
@@ -32,6 +37,8 @@ data App = App
     , persistConfig :: Settings.PersistConf
     , appLogger :: Logger
     }
+
+
 
 -- Set up i18n messages. See the message folder.
 mkMessage "App" "messages" "en"
@@ -58,6 +65,9 @@ mkMessage "App" "messages" "en"
 mkYesodData "App" $(parseRoutesFile "config/routes")
 
 type Form x = Html -> MForm (HandlerT App IO) (FormResult x, Widget)
+
+
+type AuthToken = Maybe (AuthId App) -- this is actually a 'Maybe Text' .
 
 -- Please see the documentation for the Yesod typeclass. There are a number
 -- of settings which can be configured by overriding methods here.
@@ -97,6 +107,23 @@ instance Yesod App where
     -- The page to be redirected to when authentication is required.
     authRoute _ = Just $ AuthR LoginR
 
+    -- Authorization management.
+    isAuthorized HomeR _     = return Authorized
+    isAuthorized (AuthR _) _ = return Authorized
+    isAuthorized _ _         = do
+      let members =
+              [ "muranushi@gmail.com"
+              , "tanaka.hideyuki@gmail.com"
+              , "gusmachine@gmail.com"
+              , "fumiexcel@gmail.com" ]
+
+      mu <- maybeAuthId
+      return $ case mu of
+        Just x -> if x `elem` members then Authorized else AuthenticationRequired
+        _      -> AuthenticationRequired
+
+
+
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows
     -- expiration dates to be set far in the future without worry of
@@ -119,6 +146,7 @@ instance Yesod App where
 
     makeLogger = return . appLogger
 
+
 -- How to run database actions.
 instance YesodPersist App where
     type YesodPersistBackend App = SqlPersistT
@@ -127,24 +155,31 @@ instance YesodPersistRunner App where
     getDBRunner = defaultGetDBRunner connPool
 
 instance YesodAuth App where
-    type AuthId App = UserId
+    type AuthId App = Text -- UserId
 
     -- Where to send a user after successful login
-    loginDest _ = HomeR
+    loginDest _ = SubmitR
     -- Where to send a user after logout
     logoutDest _ = HomeR
 
+    getAuthId = return . Just . credsIdent
+{-
     getAuthId creds = runDB $ do
         x <- getBy $ UniqueUser $ credsIdent creds
         case x of
             Just (Entity uid _) -> return $ Just uid
             Nothing -> do
                 fmap Just $ insert $ User (credsIdent creds) Nothing
-
+-}
     -- You can add other plugins like BrowserID, email or OAuth here
-    authPlugins _ = [authBrowserId def, authGoogleEmail]
+    authPlugins _ = [authGoogleEmail]
 
     authHttpManager = httpManager
+
+    maybeAuthId = lookupSession "_ID"
+
+
+
 
 -- This instance is required to use forms. You can modify renderMessage to
 -- achieve customized and internationalized form validation messages.
