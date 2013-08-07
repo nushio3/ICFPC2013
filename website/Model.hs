@@ -30,3 +30,9 @@ $(makeLensesFor
    , ("submissionM_score"       , "score") 
    ]   
    ''Submission)
+
+$(makeLensesFor 
+   [ ("eventM_time" , "eventTime")
+   , ("eventM_str"  , "eventStr") 
+   ]   
+   ''Event)

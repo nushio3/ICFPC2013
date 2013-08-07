@@ -24,6 +24,7 @@ library
       Handler.Submit
       Handler.Recruit
       Handler.Report
+      Handler.Event
       Contents.Contest
       Contents.Salt
 

@@ -7,9 +7,10 @@ import           Control.Lens.TH (makeLenses, makeLensesFor)
 import           Control.Monad
 import qualified Data.Text as Text
 import           Safe (headMay, maximumMay)
-import           Data.Time (UTCTime)
+import           Data.Time (getCurrentTime, UTCTime)
 import           Data.Time.LocalTime (utcToLocalTime, hoursToTimeZone)
 import           Text.Printf (printf)
+import           Prelude (head)
 
 ----------------------------------------------------------------
 -- Types and Lenses for concepts in the contest.
@@ -60,6 +61,30 @@ renderSubmission sub = do
   [whamlet| <tr> ^{tds} |]
 
   
+renderEvent :: Event -> WidgetT App IO ()  
+renderEvent evt = do               
+  let ownerMem :: TeamMember
+      ownerMem = 
+        head $
+        filter (\mem -> (mem ^. mailAddr) `Text.isInfixOf` (evt ^. eventStr)) teamMembers ++
+        [head teamMembers] 
+  
+      rico = ownerMem ^. renderIcon $ 32
+      tims = takeWhile (/= '.')$ show $  
+             utcToLocalTime (hoursToTimeZone 9) $
+             evt ^. eventTime
+      
+      evtStr = evt ^. eventStr
+      
+      tdIco  = [whamlet| <td> ^{ rico } |]
+      tdTims = [whamlet| <td> #{ tims } |]
+      tdStr  = [whamlet| <td> #{ evtStr } |]
+
+      tds :: WidgetT App IO () 
+      tds = foldr (>>) (return ()) $ [tdIco , tdTims, tdStr]    
+  
+  
+  [whamlet| <tr> ^{tds} |]
 
 ----------------------------------------------------------------
 -- Values and functions.
@@ -90,3 +115,9 @@ teamMembers =
     (\size -> [whamlet| <img src=@{StaticR img_birds_gif} width=#{size}> |] )
   ]
 
+addEvent :: Text.Text -> Handler ()
+addEvent str = do
+  t <- liftIO $ getCurrentTime
+  runDB $ do
+    insert $ Event t str
+  return ()
