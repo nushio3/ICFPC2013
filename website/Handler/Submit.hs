@@ -4,12 +4,10 @@ import Import
 import Yesod.Auth
 
 
-import Contents.Contest (teamMembers, renderIcon, renderSubmission, score, submittedTime)
+import Contents.Contest (teamMembers, renderIcon, renderSubmission, submissionQuality)
 import Control.Lens ((^.), (&), (.~))
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
-import           Data.Conduit(($$))
-import qualified Data.Conduit.List as CL
 import qualified Data.Text as Text
 import Data.Hash.MD5 (Str(..), md5i)
 import Data.Function (on)
@@ -25,11 +23,11 @@ getSubmitR = do
   maid <- maybeAuthId
 
   subs <- runDB $ do
-    subs' <- selectSource [] [] $$ CL.foldM (\xs x -> return $ x:xs) []
+    subs' <- selectList [] [] 
     return (map entityVal subs' :: [Submission])
 
   let recentSubs = take 10$ reverse $ sortBy (compare `on` (^. submittedTime))subs
-      bestSubs = take 10$ reverse $ sortBy (compare `on` (^. score))subs
+      bestSubs = take 10 $ reverse $ sortBy (compare `on` submissionQuality) subs
 
   liftIO $ hPutStr stderr $ show $ length subs
 
@@ -64,16 +62,10 @@ postSubmitR = do
 
   postedText <- runInputPost $ ireq textField "content"
   currentTime <- liftIO getCurrentTime
-  let sub0 = Submission postedText maid currentTime Nothing
-      den = md5i $ Str $ "den" ++ show sub0
-      num = md5i $ Str $ "num" ++ show sub0
-      
-      sub :: Submission
-      sub = sub0 & score .~ (Just $ den % num)
-
+  let sub0 = Submission postedText maid currentTime 0 Nothing
 
   () <- runDB $ do
-    insert sub
+    insert sub0
     return ()
  
   liftIO $ do
