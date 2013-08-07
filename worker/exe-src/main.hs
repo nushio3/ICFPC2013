@@ -8,6 +8,8 @@ import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State
 import Control.Spoon (spoon)
+import Data.ByteString.Lazy.Char8 (pack)
+import Data.Digest.Pure.SHA (integerDigest , sha1)
 import Data.List (isPrefixOf, partition)
 import Data.Maybe (fromJust)
 import Data.Ratio
@@ -26,11 +28,6 @@ $(makeLenses ''WorkerState)
 initState :: WorkerState
 initState = WorkerState 100
 
-collatz :: Integer -> Integer
-collatz n
-  | n <= 1 = 1
-  | even n = 1 + collatz (div n 2)
-  | otherwise = 1 + collatz (3*n+1)
 
 serverUrl :: FilePath
 serverUrl = "http://ec2-54-250-187-247.ap-northeast-1.compute.amazonaws.com:8496"
@@ -73,8 +70,8 @@ processCid :: String -> IO Bool
 processCid cidStr = do
   putStrLn cidStr
   let funny :: String -> Integer
-      funny = collatz . product . map ((1+) . fromIntegral . fromEnum )
-      (numStr, denStr) = partition ((\n -> div n 7/=0) . fromEnum) (cidStr ++ salt cidStr)
+      funny = (1+) . integerDigest . sha1 . pack
+      (numStr, denStr) = partition (even . fromEnum) (cidStr ++ salt cidStr)
       score :: Rational
       score = funny numStr % funny denStr
       retObj = (score,cidStr)
