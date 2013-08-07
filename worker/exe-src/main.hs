@@ -46,6 +46,7 @@ main = do
             msg :: String
             msg = printf "worker %s has fetched an event." nam
         liftIO $ do
+          hPutStrLn stderr url
           res <- openURIString $ url
           print res
         waitTime .= 100
