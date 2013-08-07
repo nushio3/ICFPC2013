@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Contents.Salt where
 
 import Prelude
