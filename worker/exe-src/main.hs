@@ -2,7 +2,7 @@
 
 import Contents.Salt(salt)
 import Control.Concurrent (threadDelay)
-import Control.Lens ((%=), (.=), use)
+import Control.Lens ((%=), (.=), (.~), use, (&))
 import Control.Lens.TH (makeLenses)
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
@@ -16,29 +16,41 @@ import Data.Ratio
 import Network.Curl.Download (openURIString)
 import Network.HTTP.Base (urlDecode, urlEncode)
 import System.IO
+import System.Environment (getArgs)
 import Text.Printf
 
 
 data WorkerState = WorkerState
   { _waitTime :: Int
+  , _workerName :: String
   }
 
 $(makeLenses ''WorkerState)
 
 initState :: WorkerState
-initState = WorkerState 100
+initState = WorkerState 100 "nameless"
 
 
 serverUrl :: FilePath
 serverUrl = "http://ec2-54-250-187-247.ap-northeast-1.compute.amazonaws.com:8496"
 
 main :: IO ()
-main = flip evalStateT initState $ forever $ do
-  success <- liftIO $ tryFetch
-  case success of
-    True  -> waitTime .= 100
-    False -> waitTime %= ( min 10000000 . (*2))
-  (liftIO . threadDelay) =<< use waitTime
+main = do
+  argv <- getArgs
+  let nam = unwords argv
+  flip evalStateT (initState & workerName .~ nam)  $ forever $ do
+    success <- liftIO $ tryFetch
+    case success of
+      True  -> do
+        let url = printf "%s/event/%s" serverUrl $ urlEncode $ show (msg,salt msg)
+            msg :: String
+            msg = printf "worker %s has fetched an event." nam
+        liftIO $ do
+          res <- openURIString $ url
+          print res
+        waitTime .= 100
+      False -> waitTime %= ( min 10000000 . (*2))
+    (liftIO . threadDelay) =<< use waitTime
 
 -- return if successfully processed a task.
 tryFetch :: IO Bool
@@ -73,9 +85,13 @@ processCid cidStr = do
       funny = (1+) . integerDigest . sha1 . pack
       (numStr, denStr) = partition (even . fromEnum) (cidStr ++ salt cidStr)
       score :: Rational
-      score = funny numStr % funny denStr
+      score = funny numStr % oddize (funny denStr)
       retObj = (score,cidStr)
       retObjSalted = (retObj, salt (show retObj))
+
+      oddize n
+        | odd n     = n
+        | otherwise = oddize $ div n 2
   print retObjSalted
   let url = printf "%s/report/%s" serverUrl $ urlEncode $ show retObjSalted
   res <- openURIString $ url
