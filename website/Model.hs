@@ -26,7 +26,7 @@ $(makeLensesFor
    [ ("submissionM_commitId"    , "commitId")
    , ("submissionM_ownerAuth"   , "ownerAuth")
    , ("submissionM_time"        , "submittedTime")
-   , ("submissionM_aging"    , "aging") 
+   , ("submissionM_aging"       , "aging") 
    , ("submissionM_score"       , "score") 
    ]   
    ''Submission)

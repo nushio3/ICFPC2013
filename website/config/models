@@ -18,7 +18,7 @@ Submission
     m_ownerAuth    Text Maybe
     m_time         UTCTime
     m_aging        Int
-    m_score        Rational Maybe
+    m_score        [Rational] 
 
     UniqueSubmission m_commitId
     deriving Show Typeable

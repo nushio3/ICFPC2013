@@ -62,7 +62,7 @@ postSubmitR = do
 
   postedText <- runInputPost $ ireq textField "content"
   currentTime <- liftIO getCurrentTime
-  let sub0 = Submission postedText maid currentTime 0 Nothing
+  let sub0 = Submission postedText maid currentTime 0 []
 
   () <- runDB $ do
     insert sub0

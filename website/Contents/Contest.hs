@@ -2,11 +2,11 @@ module Contents.Contest where
 
 import           Import
 
-import           Control.Lens ((^.), Iso', iso)
+import           Control.Lens ((^.), Iso', iso, to)
 import           Control.Lens.TH (makeLenses, makeLensesFor)
 import           Control.Monad
 import qualified Data.Text as Text
-import           Safe (headMay)
+import           Safe (headMay, maximumMay)
 import           Data.Time (UTCTime)
 import           Data.Time.LocalTime (utcToLocalTime, hoursToTimeZone)
 import           Text.Printf (printf)
@@ -30,7 +30,7 @@ submissionPriority sub = (negate $ sub ^. aging, sub ^. submittedTime)
 
 -- | larger, the better.
 submissionQuality :: Submission -> (Maybe Rational, UTCTime)
-submissionQuality sub = (sub ^. score, sub ^. submittedTime)
+submissionQuality sub = (sub ^. score . to maximumMay, sub ^. submittedTime)
 
 
 
@@ -44,7 +44,7 @@ renderSubmission sub = do
         | Text.length subi0 > 60 = Text.take 60 subi0 <> "..."
         | otherwise              = subi0
 
-      sco  = maybe (printf "N/A(%d)" (sub ^. aging)) ((show :: Double -> String) . fromRational) $ sub ^. score
+      sco  = maybe (printf "N/A(%d)" (sub ^. aging)) ((show :: Double -> String) . fromRational) $ sub ^. score . to maximumMay
       tims = takeWhile (/= '.')$ show $  
              utcToLocalTime (hoursToTimeZone 9) $
              sub ^. submittedTime
