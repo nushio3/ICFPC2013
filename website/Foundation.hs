@@ -112,6 +112,7 @@ instance Yesod App where
     isAuthorized (AuthR _) _     = return Authorized
     isAuthorized (RecruitR _) _  = return Authorized
     isAuthorized (ReportR _) _   = return Authorized
+    isAuthorized (EventR _) _    = return Authorized
     isAuthorized _ _ = do
       let members =
               [ "muranushi@gmail.com"
