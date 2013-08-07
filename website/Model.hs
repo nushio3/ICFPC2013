@@ -2,6 +2,7 @@ module Model where
 
 import Prelude
 import Yesod
+import Data.Aeson.TH
 import Data.Ratio
 import Data.Text (Text)
 import Data.Time (UTCTime)
@@ -16,3 +17,4 @@ import Data.Typeable (Typeable)
 share [mkPersist sqlOnlySettings, mkMigrate "migrateAll"]
     $(persistFileWith lowerCaseSettings "config/models")
 
+$(deriveJSON (drop 12) ''Submission)

@@ -7,6 +7,7 @@ import           Control.Lens.TH (makeLenses, makeLensesFor)
 import           Control.Monad
 import qualified Data.Text as Text
 import           Safe (headMay)
+import           Data.Time.LocalTime (utcToLocalTime, hoursToTimeZone)
 
 ----------------------------------------------------------------
 -- Types and Lenses for concepts in the contest.
@@ -42,7 +43,9 @@ renderSubmission sub = do
         | otherwise              = subi0
 
       sco  = maybe (0::Double) (fromRational) $ sub ^. score
-      tims = takeWhile (/= '.')$ show $ sub ^. submittedTime
+      tims = takeWhile (/= '.')$ show $  
+             utcToLocalTime (hoursToTimeZone 9) $
+             sub ^. submittedTime
       tdIco  = [whamlet| <td> ^{ rico } |]
       tdComi = [whamlet| <td> #{ subi } |]
       tdTims = [whamlet| <td> #{ tims } |]
