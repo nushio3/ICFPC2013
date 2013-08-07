@@ -5,6 +5,7 @@ import Import
 import           Contents.Contest (submissionPriority)
 import           Contents.Salt (salt)
 import           Control.Lens ((^.), (%~), (&), to)
+import           Control.Monad
 import           Data.Conduit(($$))
 import qualified Data.Conduit.List as CL
 import           Data.Function (on)
