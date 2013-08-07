@@ -3,4 +3,6 @@ module Handler.Report where
 import Import
 
 getReportR :: String -> Handler Html
-getReportR = error "Not yet implemented: getReportR"
+getReportR str = do
+    defaultLayout $ do
+      [whamlet| You have just entered  #{str} . |]

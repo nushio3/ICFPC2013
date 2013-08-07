@@ -11,5 +11,5 @@ devel:
 
 deploy:
 	git pull
-	cabal install
-	website Production
+	cabal build
+	./dist/build/website/website Production

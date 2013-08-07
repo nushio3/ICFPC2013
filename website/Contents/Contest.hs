@@ -7,7 +7,9 @@ import           Control.Lens.TH (makeLenses, makeLensesFor)
 import           Control.Monad
 import qualified Data.Text as Text
 import           Safe (headMay)
+import           Data.Time (UTCTime)
 import           Data.Time.LocalTime (utcToLocalTime, hoursToTimeZone)
+import           Text.Printf (printf)
 
 ----------------------------------------------------------------
 -- Types and Lenses for concepts in the contest.
@@ -22,15 +24,15 @@ data TeamMember = TeamMember
 $(makeLenses ''TeamMember)
 
 
+-- | the priority of the submission. The larger, the higher priority.
+submissionPriority :: Submission -> (Int, UTCTime)
+submissionPriority sub = (negate $ sub ^. aging, sub ^. submittedTime)
 
--- make lenses for Persistent record types defined in config/models .
+-- | larger, the better.
+submissionQuality :: Submission -> (Maybe Rational, UTCTime)
+submissionQuality sub = (sub ^. score, sub ^. submittedTime)
 
-$(makeLensesFor 
-   [ ("submissionM_commitId"    , "commitId")
-   , ("submissionM_ownerAuth"   , "ownerAuth")
-   , ("submissionM_time"        , "submittedTime")
-   , ("submissionM_score"       , "score") ]
-   ''Submission)
+
 
 renderSubmission :: Submission -> WidgetT App IO ()
 renderSubmission sub = do
@@ -42,7 +44,7 @@ renderSubmission sub = do
         | Text.length subi0 > 60 = Text.take 60 subi0 <> "..."
         | otherwise              = subi0
 
-      sco  = maybe (0::Double) (fromRational) $ sub ^. score
+      sco  = maybe (printf "N/A(%d)" (sub ^. aging)) ((show :: Double -> String) . fromRational) $ sub ^. score
       tims = takeWhile (/= '.')$ show $  
              utcToLocalTime (hoursToTimeZone 9) $
              sub ^. submittedTime

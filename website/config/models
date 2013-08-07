@@ -17,6 +17,7 @@ Submission
     m_commitId     Text
     m_ownerAuth    Text Maybe
     m_time         UTCTime
+    m_aging        Int
     m_score        Rational Maybe
 
     UniqueSubmission m_commitId
