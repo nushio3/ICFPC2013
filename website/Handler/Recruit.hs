@@ -3,6 +3,7 @@ module Handler.Recruit where
 import Import
 
 import           Contents.Contest (submissionPriority)
+import           Contents.Salt (salt)
 import           Control.Lens ((^.), (%~), (&), to)
 import           Data.Conduit(($$))
 import qualified Data.Conduit.List as CL
@@ -13,12 +14,19 @@ import           Network.HTTP.Base (urlEncode)
 import           Safe (lastMay)
 
 
-getRecruitR :: Handler Html
-getRecruitR = do
+
+getRecruitR :: String -> Handler Html
+getRecruitR reqStr = do
+  when (reqStr /= salt "recruit") notFound
+  
   subKVs <- runDB $ selectList [] [] 
     
   let nextSubKV :: Maybe (Entity Submission)
-      nextSubKV = lastMay $ sortBy (compare `on` (submissionPriority . entityVal) ) subKVs
+      nextSubKV = 
+        lastMay $ 
+        sortBy (compare `on` (submissionPriority . entityVal) ) $
+        filter (null . (^. score) . entityVal) $
+        subKVs
       
       nextTask :: String
       nextTask = 

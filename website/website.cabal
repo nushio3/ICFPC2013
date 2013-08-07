@@ -13,18 +13,19 @@ Flag library-only
 
 library
     exposed-modules: 
-                     Application
-                     Foundation
-                     Import
-                     Model
-                     Settings
-                     Settings.StaticFiles
-                     Settings.Development
-                     Handler.Home
-                     Handler.Submit
-                     Handler.Recruit
-                     Handler.Report
-                     Contents.Contest
+      Application
+      Foundation
+      Import
+      Model
+      Settings
+      Settings.StaticFiles
+      Settings.Development
+      Handler.Home
+      Handler.Submit
+      Handler.Recruit
+      Handler.Report
+      Contents.Contest
+      Contents.Salt
 
     if flag(dev) || flag(library-only)
         cpp-options:   -DDEVELOPMENT
@@ -84,6 +85,7 @@ library
       , safe
       , MissingH
       , HTTP
+      , SHA
 
 executable         website
     if flag(library-only)

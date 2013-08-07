@@ -108,9 +108,11 @@ instance Yesod App where
     authRoute _ = Just $ AuthR LoginR
 
     -- Authorization management.
-    isAuthorized HomeR _     = return Authorized
-    isAuthorized (AuthR _) _ = return Authorized
-    isAuthorized _ _         = do
+    isAuthorized HomeR _         = return Authorized
+    isAuthorized (AuthR _) _     = return Authorized
+    isAuthorized (RecruitR _) _  = return Authorized
+    isAuthorized (ReportR _) _   = return Authorized
+    isAuthorized _ _ = do
       let members =
               [ "muranushi@gmail.com"
               , "tanaka.hideyuki@gmail.com"
