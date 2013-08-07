@@ -25,8 +25,9 @@ Submission
 
 Event
     m_time         UTCTime
-    m_contents     Text
+    m_str          Text
     
+    UniqueEvent m_time m_str
 
 -- Prefix all members by 'm_' so that we can create lenses for the default names.
 -- By default this file is used in Model.hs (which is imported by Foundation.hs)

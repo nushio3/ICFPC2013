@@ -4,7 +4,7 @@ import Import
 import Yesod.Auth
 
 
-import Contents.Contest (teamMembers, renderIcon, renderSubmission, submissionQuality)
+import Contents.Contest (teamMembers, renderIcon, renderSubmission, submissionQuality, addEvent, renderEvent)
 import Control.Lens ((^.), (&), (.~))
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
@@ -26,9 +26,15 @@ getSubmitR = do
     subs' <- selectList [] [] 
     return (map entityVal subs' :: [Submission])
 
+  evts <- runDB $ do
+    evts' <- selectList [] [] 
+    return (map entityVal evts' :: [Event])
+
   let recentSubs = take 10$ reverse $ sortBy (compare `on` (^. submittedTime))subs
       bestSubs = take 10 $ reverse $ sortBy (compare `on` submissionQuality) subs
 
+      recentEvts = take 20 $ reverse $ sortBy (compare `on` (^. eventTime)) evts
+  
   liftIO $ hPutStr stderr $ show $ length subs
 
   defaultLayout $ do
@@ -46,6 +52,10 @@ getSubmitR = do
     let rows = foldr (>>) (return ()) $ map renderSubmission recentSubs 
     [whamlet| <table cellpadding=3> ^{scoreTableHeader} ^{rows} |]
 
+    [whamlet| <h2> Recent Events |]
+    let rows = foldr (>>) (return ()) $ map renderEvent recentEvts
+    [whamlet| <table cellpadding=3> ^{eventTableHeader} ^{rows} |]
+
   where
     scoreTableHeader = [whamlet|
 <tr> 
@@ -53,6 +63,12 @@ getSubmitR = do
    <td> time
    <td> commit ID
    <td> score
+|]    
+    eventTableHeader = [whamlet|
+<tr> 
+   <td> icon
+   <td> time
+   <td> event
 |]    
 
 
@@ -70,6 +86,11 @@ postSubmitR = do
  
   liftIO $ do
     hPutStrLn stderr (show postedText)
+    
+  case maid of
+    Just addr -> addEvent $ addr <> " has suggested : " <> postedText
+    _         -> return ()
+    
   defaultLayout $ do
     $(widgetFile "auth-test")
     $(widgetFile "submitted")
