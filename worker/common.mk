@@ -5,6 +5,7 @@ init:
 	cabal configure --enable-tests
 
 build: init
+	cp ../website/Contents/Salt.hs exe-src/Contents/
 	cabal build
 
 clean:
@@ -23,4 +24,3 @@ sync:
 	git pull
 
 CI: sync test
-

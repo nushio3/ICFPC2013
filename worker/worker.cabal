@@ -19,4 +19,15 @@ executable worker
   hs-source-dirs:    exe-src
   -- other-modules:       
   build-depends:       
-    base ==4.6.*
+      base ==4.6.*
+    , bytestring
+    , download-curl
+    , HTTP
+    , lens
+    , mtl
+    , safe
+    , SHA
+    , spoon
+    , transformers
+
+    
