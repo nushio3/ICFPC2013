@@ -22,6 +22,8 @@ library
                      Settings.Development
                      Handler.Home
                      Handler.Submit
+                     Handler.Recruit
+                     Handler.Report
                      Contents.Contest
 
     if flag(dev) || flag(library-only)

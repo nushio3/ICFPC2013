@@ -6,3 +6,5 @@
 
 / HomeR GET POST
 /submit SubmitR GET POST
+/recruit RecruitR GET
+/report/#String ReportR GET
