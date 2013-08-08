@@ -105,5 +105,5 @@ processCid givenStr = do
       den = 10
       retObj = (cidStr, num % den)
   print retObj
-  -- openServer "report" retObj
+  openServer "report" retObj
   return True
