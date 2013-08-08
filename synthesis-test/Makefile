@@ -1,3 +1,5 @@
+all: build
+
 include common.mk
 
-all: build
+

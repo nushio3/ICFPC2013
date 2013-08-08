@@ -16,6 +16,7 @@ cabal-version:       >=1.8
 
 executable test-01
   main-is: test-01.hs            
+  hs-source-dirs: exe-src/
   build-depends: 
       base ==4.6.*
     , sbv >= 2.10
