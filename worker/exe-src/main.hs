@@ -96,7 +96,7 @@ processCid givenStr = do
   putStrLn givenStr
   let cidStr = concat $ take 1 $ words givenStr
   
-  system $ printf "git clone git@github.com:nushio3/ICFPC2013"
+--  system $ printf "git clone git@github.com:nushio3/ICFPC2013"
 
   
   let num :: Integer
