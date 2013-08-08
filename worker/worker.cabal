@@ -27,6 +27,7 @@ executable worker
     , mtl
     , safe
     , crypto-api
+    , process
     , RSA
     , SHA
     , spoon

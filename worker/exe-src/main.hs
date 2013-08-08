@@ -17,6 +17,7 @@ import Data.Ratio
 import Network.Curl.Download (openURIString)
 import Network.HTTP.Base (urlDecode, urlEncode)
 import System.IO
+import System.Process (system)
 import System.Environment (getArgs)
 import Text.Printf
 
@@ -91,17 +92,18 @@ tryFetch = do
               return $ Just cidStr
 
 processCid :: String -> IO Bool
-processCid cidStr = do
-  putStrLn cidStr
-  let funny :: String -> Integer
-      funny = (1+) . integerDigest . sha1 . pack
-      (numStr, denStr) = partition (even . fromEnum) (cidStr ++ ['0'..'z'])
-      score :: Rational
-      score = funny numStr % oddize (funny denStr)
-      retObj = (score,cidStr)
-      oddize n
-        | odd n     = n
-        | otherwise = oddize $ div n 2
+processCid givenStr = do
+  putStrLn givenStr
+  let cidStr = concat $ take 1 $ words givenStr
+  
+  system $ printf "git clone git@github.com:nushio3/ICFPC2013"
+
+  
+  let num :: Integer
+      num = 72
+      den :: Integer
+      den = 10
+      retObj = (cidStr, num % den)
   print retObj
-  openServer "report" retObj
+  -- openServer "report" retObj
   return True
