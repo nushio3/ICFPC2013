@@ -17,7 +17,6 @@ import Data.Ratio
 import Network.Curl.Download (openURIString)
 import Network.HTTP.Base (urlDecode, urlEncode)
 import System.IO
-import System.Process (system)
 import System.Environment (getArgs)
 import Text.Printf
 
@@ -49,7 +48,7 @@ main :: IO ()
 main = do
   argv <- getArgs
   let nam = unwords argv
-  flip evalStateT (initState & workerName .~ nam)  $ forever $ do
+  flip evalStateT (initState & workerName .~ nam) $ forever $ do
     maybeCommitId <- liftIO $ tryFetch
     case maybeCommitId of
       Nothing -> waitTime %= ( min 10000000 . (*2))
@@ -58,7 +57,7 @@ main = do
         liftIO $ openServer "event" $ (printf "%s received a task: %s" nam cid :: String)
         success <- liftIO $ processCid cid
         let whpn
-              | success   = "finished"
+              | success = "finished"
               | otherwise = "couldn't process"
         liftIO $ openServer "event" $ (printf "%s %s task: %s" nam whpn cid :: String)
         waitTime .= 10000
@@ -69,7 +68,7 @@ tryFetch :: IO (Maybe String)
 tryFetch = do
   currentTime <- getCurrentTime
   let msg :: String
-      msg =  show currentTime ++ "recruit"
+      msg = show currentTime ++ "recruit"
   res <- openServer "recruit" msg
   case res of
     Left errmsg -> hPutStr stderr errmsg >> return Nothing
@@ -91,8 +90,6 @@ tryFetch = do
             Just cidStr -> do
               return $ Just cidStr
 
-
-
 processCid :: String -> IO Bool
 processCid cidStr = do
   putStrLn cidStr
@@ -108,3 +105,4 @@ processCid cidStr = do
   print retObj
   openServer "report" retObj
   return True
+
