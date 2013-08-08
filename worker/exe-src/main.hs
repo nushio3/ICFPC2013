@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-import Contents.Salt(salt)
+import Contents.Salt(encodeString)
 import Control.Concurrent (threadDelay)
 import Control.Lens ((%=), (.=), (.~), use, (&))
 import Control.Lens.TH (makeLenses)
@@ -9,7 +9,8 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State
 import Control.Spoon (spoon)
 import Data.ByteString.Lazy.Char8 (pack)
-import Data.Digest.Pure.SHA (integerDigest , sha1)
+import Data.Digest.Pure.SHA(sha1,integerDigest)
+import Data.Time (getCurrentTime)
 import Data.List (isPrefixOf, partition)
 import Data.Maybe (fromJust)
 import Data.Ratio
@@ -28,42 +29,52 @@ data WorkerState = WorkerState
 $(makeLenses ''WorkerState)
 
 initState :: WorkerState
-initState = WorkerState 100 "nameless"
+initState = WorkerState 10000 "nameless"
 
 
 serverUrl :: FilePath
 serverUrl = "http://ec2-54-250-187-247.ap-northeast-1.compute.amazonaws.com:8496"
+
+openServer :: Show a => String -> a -> IO (Either String String)
+openServer subdir msg = do
+  encMsg <- encodeString msg
+  let url = printf "%s/%s/%s" serverUrl subdir $ encMsg
+  hPutStrLn stderr url
+  res <- openURIString $ url
+  print res
+  return res
 
 main :: IO ()
 main = do
   argv <- getArgs
   let nam = unwords argv
   flip evalStateT (initState & workerName .~ nam)  $ forever $ do
-    success <- liftIO $ tryFetch
-    case success of
-      True  -> do
-        let url = printf "%s/event/%s" serverUrl $ urlEncode $ show (msg,salt msg)
-            msg :: String
-            msg = printf "worker %s has fetched an event." nam
-        liftIO $ do
-          hPutStrLn stderr url
-          res <- openURIString $ url
-          print res
-        waitTime .= 100
-      False -> waitTime %= ( min 10000000 . (*2))
+    maybeCommitId <- liftIO $ tryFetch
+    case maybeCommitId of
+      Nothing -> waitTime %= ( min 10000000 . (*2))
+
+      Just cid -> do
+        liftIO $ openServer "event" $ (printf "%s received a task: %s" nam cid :: String)
+        success <- liftIO $ processCid cid
+        let whpn
+              | success   = "finished"
+              | otherwise = "couldn't process"
+        liftIO $ openServer "event" $ (printf "%s %s task: %s" nam whpn cid :: String)
+        waitTime .= 10000
     (liftIO . threadDelay) =<< use waitTime
 
 -- return if successfully processed a task.
-tryFetch :: IO Bool
+tryFetch :: IO (Maybe String)
 tryFetch = do
-  let url = printf "%s/recruit/%s" serverUrl (salt "recruit")
-  hPutStrLn stderr url
-  res <- openURIString $ url
+  currentTime <- getCurrentTime
+  let msg :: String
+      msg =  show currentTime ++ "recruit"
+  res <- openServer "recruit" msg
   case res of
-    Left errmsg -> hPutStr stderr errmsg >> return False
+    Left errmsg -> hPutStr stderr errmsg >> return Nothing
     Right con -> do
       case filter (isPrefixOf "your_task:") $ lines con of
-        [] -> hPutStrLn stderr "task not found." >> return False
+        [] -> hPutStrLn stderr "task not found." >> return Nothing
         (taskStr:_) -> do
           let protoCid :: String
               protoCid = words taskStr !! 1
@@ -75,25 +86,22 @@ tryFetch = do
           case maybeCid of
             Nothing -> do
                        hPutStrLn stderr $ "cannot parse commit ID string: " ++ protoCid
-                       return False
+                       return Nothing
             Just cidStr -> do
-              processCid cidStr
+              return $ Just cidStr
 
 processCid :: String -> IO Bool
 processCid cidStr = do
   putStrLn cidStr
   let funny :: String -> Integer
       funny = (1+) . integerDigest . sha1 . pack
-      (numStr, denStr) = partition (even . fromEnum) (cidStr ++ salt cidStr)
+      (numStr, denStr) = partition (even . fromEnum) (cidStr ++ ['0'..'z'])
       score :: Rational
       score = funny numStr % oddize (funny denStr)
       retObj = (score,cidStr)
-      retObjSalted = (retObj, salt (show retObj))
-
       oddize n
         | odd n     = n
         | otherwise = oddize $ div n 2
-  print retObjSalted
-  let url = printf "%s/report/%s" serverUrl $ urlEncode $ show retObjSalted
-  res <- openURIString $ url
+  print retObj
+  openServer "report" retObj
   return True
