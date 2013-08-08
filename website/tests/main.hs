@@ -11,6 +11,7 @@ import Test.Hspec (hspec)
 import Application (makeFoundation)
 
 import HomeTest
+import CryptoTest
 
 main :: IO ()
 main = do
@@ -19,5 +20,6 @@ main = do
                 }
     foundation <- makeFoundation conf
     hspec $ do
-        yesodSpec foundation $ do
-            homeSpecs
+      cryptoSpecs
+--         yesodSpec foundation $ do
+--             homeSpecs

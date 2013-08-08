@@ -2,6 +2,10 @@ all: build
 
 .PHONY: deploy devel
 
+init:
+	cabal install --only-dependencies --enable-tests
+	cabal configure --enable-tests
+
 build:
 	cabal build
 
