@@ -103,7 +103,7 @@ processCid givenStr = do
       num = 72
       den :: Integer
       den = 10
-      retObj = (cidStr, num % den)
+      retObj = (givenStr, num % den)
   print retObj
   openServer "report" retObj
   return True
