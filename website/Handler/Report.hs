@@ -2,23 +2,20 @@ module Handler.Report where
 
 import Import
 
-import           Contents.Salt (salt)
+import           Contents.Salt (decode)
 import           Control.Lens ((&),(%~))
 import           Control.Monad
 import qualified Data.Text as Text
 import           Safe (readMay)
 
 
-getReportR :: String -> Handler Html
+getReportR :: Text.Text -> Handler Html
 getReportR str = do
-  liftIO $ print str
-  let reportMay :: Maybe ((Rational, Text.Text), String)
-      reportMay = readMay str
+  let reportMay :: Maybe (Rational, Text.Text)
+      reportMay = decode str
   case reportMay of
     Nothing -> notFound
-    Just (solution@(newScore, commitId) , saltStr)-> do
-      when (salt (show solution) /= saltStr) notFound
-      
+    Just (solution@(newScore, commitId))-> do
       runDB $ do
         keyMay <- getBy (UniqueSubmission commitId)
         case (keyMay :: Maybe (Entity Submission) ) of

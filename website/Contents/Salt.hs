@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Contents.Salt where
----       (salt, encode, decode, encodeString, decodeString)where
+module Contents.Salt 
+  (encode, decode, encodeString, decodeString)where
 
 import Prelude
 
@@ -15,7 +15,6 @@ import           Data.String (IsString(..))
 import qualified Data.Text as Text
 import           Safe (readMay)
 
-salt = id
 
 encode :: Show a => a -> IO Text.Text
 encode = fmap Text.pack . encodeString

@@ -3,7 +3,7 @@ module Handler.Recruit where
 import Import
 
 import           Contents.Contest (submissionPriority)
-import           Contents.Salt (salt)
+import           Contents.Salt (decode)
 import           Control.Lens ((^.), (%~), (&), to)
 import           Control.Monad
 import           Data.Conduit(($$))
@@ -16,9 +16,10 @@ import           Safe (lastMay)
 
 
 
-getRecruitR :: String -> Handler Html
+getRecruitR :: Text.Text -> Handler Html
 getRecruitR reqStr = do
-  when (reqStr /= salt "recruit") notFound
+  let cond = (fmap (Text.isInfixOf "recruit") $ decode reqStr)
+  when (cond /= Just True) notFound
   
   subKVs <- runDB $ selectList [] [] 
     
