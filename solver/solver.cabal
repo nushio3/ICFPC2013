@@ -21,6 +21,7 @@ library
     RichBV
     SRichBV
     Convert
+    API
 
   hs-source-dirs:    src/  
   -- other-modules:       
@@ -34,6 +35,11 @@ library
     , random
     , sbv == 2.10.*
     , trifecta ==1.1.*
+    , text
+    , network
+    , http-types
+    , reflection
+    , http-conduit
   Ghc-Options: -Wall -O2
 
 Test-Suite spec
@@ -80,3 +86,5 @@ executable rich-main
     , solver
     , safe
     , sbv == 2.10.*
+    , reflection
+    , text
