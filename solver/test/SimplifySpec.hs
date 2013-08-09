@@ -25,7 +25,7 @@ import TestInputs
 
 spec :: Spec
 spec = do
-  describe "simplification" $ do
+  describe "RichBV ---> simplify RichBV" $ do
     forM_ programs $ \src -> do
       prop ("prog == simplify prog for " ++ src) $ \x -> 
         let 

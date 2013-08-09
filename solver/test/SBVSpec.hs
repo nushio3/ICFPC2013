@@ -39,7 +39,7 @@ unsafeSExec prog i = unsafePerformIO $ do
   
 spec :: Spec
 spec = do
-  describe "sbv spec" $ do
+  describe "BV --> SBV" $ do
     forM_ programs $ \src -> do
       prop ("exec == sExec for " ++ src) $ \x -> 
         let prog = readProgram src in

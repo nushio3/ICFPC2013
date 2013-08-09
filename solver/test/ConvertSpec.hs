@@ -20,7 +20,7 @@ import TestInputs
   
 spec :: Spec
 spec = do
-  describe "equality of enrichment" $ do
+  describe "BV --> RichBV" $ do
     forM_ programs $ \src -> do
       prop ("BV.exec == RichBV.eval for " ++ src) $ \x -> 
         let 
