@@ -72,6 +72,9 @@ programSize (Program _ e) = 1 + exprSize e
 
 type BitVector = Word64
 
+exec :: Program -> BitVector -> BitVector
+exec (Program x e) i = eval (Map.singleton x i) e
+
 eval :: M.Map Idfr BitVector -> Expr -> BitVector
 eval m (If0 a b c) = if eval m a == 0 then eval m b else eval m c
 eval m (Fold a b (Reducer v w e)) = foldr (\x y -> eval (m & ix v .~ x & ix w .~ y) e) (eval m b)
