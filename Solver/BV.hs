@@ -1,5 +1,6 @@
 import Text.Trifecta
 import Control.Applicative
+import Control.Lens
 
 identifier = token $ some lower
 
@@ -52,3 +53,14 @@ parseProgram = parens $ do
     b <- parens identifier
     e <- parseExpr
     return $ Program b e
+
+exprSize :: Expr -> Int
+exprSize (If0 a b c) = 1 + exprSize a + exprSize b + exprSize c
+exprSize (Fold a b (Reducer _ _ c)) = 1 + exprSize a + exprSize b + exprSize c
+exprSize (Op1 _ e0) = 1 + exprSize e0
+exprSize (Op2 _ e0 e1) = 1 + exprSize e0 + exprSize e1
+exprSize C0 = 1
+exprSize C1 = 1
+
+programSize :: Program -> Int
+programSize (Program _ e) = 1 + exprSize e
