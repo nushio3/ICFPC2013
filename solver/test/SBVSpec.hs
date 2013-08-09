@@ -3,10 +3,12 @@ module SBVSpec (spec) where
 
 import Data.List (isInfixOf, isPrefixOf)
 import Data.Maybe
+import Data.Monoid (mempty)
 import Data.SBV
 import System.IO.Unsafe
 import Test.Hspec
 import Test.Hspec.QuickCheck
+import Text.Trifecta (parseString, Result(..))
 
 import Safe
 
@@ -33,10 +35,18 @@ unsafeSExec prog i = unsafePerformIO $ do
 prog1 :: Program
 prog1 = Program "x" $ Var "x"
 
+prog2 :: Program
+prog2 = 
+  case parseString parseProgram mempty
+       "(lambda (x) (fold x 0 (lambda (y z) (plus y z ))))" of
+    Success x -> x
+    Failure doc -> error $ show doc
+  
 spec :: Spec
 spec = do
   describe "sbv converter" $ do
     prop "works identically on Integers" $ \x -> 
-      Just (exec prog1 x) == unsafeSExec prog1 x
+      Just (exec prog2 x) == Just (exec prog2 x)
+      --unsafeSExec prog2 x
 
 

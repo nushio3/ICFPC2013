@@ -1,0 +1,2 @@
+(lambda (x_10381) (if0 (or (and (shr1 x_10381) 1) 0) x_10381 1))
+(lambda (x) (fold x 0 (lambda (y z) (plus y z ))))
