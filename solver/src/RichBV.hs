@@ -2,9 +2,12 @@
 
 module RichBV where
 
-import Data.Aeson
+import Control.Applicative
+import Control.Monad
 import Control.Lens.Aeson
 import Control.Lens
+
+import Data.Aeson
 import Data.List
 import Control.Monad
 import Data.Word
@@ -23,11 +26,18 @@ solve' p = do
       ops  = p ^.. key "operators"._Array.traverse._String.unpacked
   solve size ops
 
+-- >>> prove $ forAll_ $ \x -> x*2 .== x+(x :: SWord64)
+-- Q.E.D.
+
 mismatchTolerance :: Int
 mismatchTolerance = 60
 
 retryTimes :: Int
 retryTimes = 1000
+
+retract :: Endo [a] -> [a]
+retract (Endo f) = f []
+{-# INLINE retract #-}
 
 solve :: Int -> [String] -> IO (Maybe (Context [Word64] [Word64] String))
 solve size ops = do
@@ -44,11 +54,11 @@ solve size ops = do
         let xs = [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ vs
         let res  = [ (map (eval p) xs, Endo (p:)) | p <- ss]
             mm   = M.fromListWith mappend res
-            freq = maximum $ map (length . flip appEndo []) $ M.elems mm
+            freq = maximum $ map (length . retract) $ M.elems mm
         if freq <= mismatchTolerance
           then do
-            mapM_ print $ zip (M.keys mm) (map (head . flip appEndo []) $ M.elems mm)
-            return $ Just $ Context (\vss -> printProgram $ ms M.! head (appEndo (mm M.! vss) [])) xs
+            mapM_ print $ zip (M.keys mm) (map (head . retract) $ M.elems mm)
+            return $ Just $ Context (\vss -> printProgram $ ms M.! head (retract $ mm M.! vss)) xs
           else do
             if i > retryTimes
               then return Nothing
