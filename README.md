@@ -1,5 +1,8 @@
 ICFPC2013
 =========
+
+the contest Site: http://icfpc2013.cloudapp.net/
+
 See the wiki pages.
 
 https://github.com/nushio3/ICFPC2013/wiki/_pages
