@@ -1,5 +1,10 @@
+<html>
+<head>
+</head>
+<body>
+<h2>Problems getting solved now</h2>
 <table><tr><th>id</th><th>size</th><th>operators</th></tr>
-{% for p in problems %}
+{% for p in under_solve_problems %}
 <tr>
   <td>{{ p.id }}</td>
   <td>{{ p.size }}</td>
@@ -10,3 +15,47 @@
 </tr>
 {% endfor %}
 </table>
+
+<h2>Problems left untouched</h2>
+<table><tr><th>id</th><th>size</th><th>operators</th></tr>
+{% for p in untouched_problems %}
+<tr>
+  <td>{{ p.id }}</td>
+  <td>{{ p.size }}</td>
+  <td>{% for op in p.operators %}
+      {{ op }},
+      {% endfor %}
+  </td>
+</tr>
+{% endfor %}
+</table>
+
+<h2>Solved problems</h2>
+<table><tr><th>id</th><th>size</th><th>operators</th></tr>
+{% for p in solved_problems %}
+<tr>
+  <td>{{ p.id }}</td>
+  <td>{{ p.size }}</td>
+  <td>{% for op in p.operators %}
+      {{ op }},
+      {% endfor %}
+  </td>
+</tr>
+{% endfor %}
+</table>
+
+<h2>Dead problems</h2>
+<table><tr><th>id</th><th>size</th><th>operators</th></tr>
+{% for p in dead_problems %}
+<tr>
+  <td>{{ p.id }}</td>
+  <td>{{ p.size }}</td>
+  <td>{% for op in p.operators %}
+      {{ op }},
+      {% endfor %}
+  </td>
+</tr>
+{% endfor %}
+</table>
+</body>
+</html>
