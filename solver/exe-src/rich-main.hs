@@ -13,7 +13,7 @@ import API
 
 solveAndAnswer :: Given Token => T.Text -> Int -> [T.Text] -> IO (String, GuessResponse)
 solveAndAnswer tid size ops = do
-    Just (Context restore query) <- solve size $ map T.unpack ops
+    Just (Context restore query) <- solve size (map T.unpack ops) equiv
     EvalResponse _ (Just eout) _ <- API.eval
         $ EvalRequest (Just tid) Nothing
         $ map (T.pack . printf "0x%016X") query
@@ -32,8 +32,9 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
     ("submit" : _) -> do
         putStrLn "This feature is locked"
     ("hoge" : _) -> do
-      let progs = genProgram 9 $ map toOp ["and","if0","or"]
-      mapM_ (\p -> putStrLn $ printProgram p ++ " -> " ++ printProgram ((canonic.simplify.moveOp2P.moveIfP.simplify.canonic $ p))) progs
+      progs <- solve 9 ["if0","not","shl1","shr16"] equiv
+      -- mapM_ (\p -> putStrLn $ printProgram p ++ " -> " ++ printProgram ((canonic.simplify.moveOp2P.moveIfP.simplify.canonic $ p))) progs
+      return ()
 
 -- programs :: IO [Program]
 -- programs = map read . lines <$> getContents

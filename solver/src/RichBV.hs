@@ -16,6 +16,7 @@ import Data.Bits
 import Data.Monoid
 import System.Random
 import qualified Data.Map.Strict as M
+import Data.Function
 
 -- $setup
 -- >>> import Data.SBV
@@ -24,7 +25,7 @@ solve' :: Value -> IO (Maybe (Context [Word64] [Word64] String))
 solve' p = do
   let size = p ^?! key "size"._Integer.from enum
       ops  = p ^.. key "operators"._Array.traverse._String.unpacked
-  solve size ops
+  solve size ops undefined
 
 -- >>> prove $ forAll_ $ \x -> x*2 .== x+(x :: SWord64)
 -- Q.E.D.
@@ -39,17 +40,23 @@ retract :: Endo [a] -> [a]
 retract (Endo f) = f []
 {-# INLINE retract #-}
 
-solve :: Int -> [String] -> IO (Maybe (Context [Word64] [Word64] String))
-solve size ops = do
+optimize :: Program -> Program
+optimize = canonic.simplify.moveOp2P.moveIfP.simplify.moveOp2P.moveIfP.simplify.canonic -- .destructFold
+
+solve :: Int -> [String] -> (Program -> Program -> IO Bool) -> IO (Maybe (Context [Word64] [Word64] String))
+solve size ops equiv = do
   let ps = genProgram (fromIntegral size) $ map toOp ops
-      qs = map (canonic.simplify.moveOp2P.moveIfP.simplify.canonic) ps
+      qs = map optimize ps
       ms = M.fromList $ zip qs ps
       ss = M.keys ms
+  putStrLn $ "Size: " ++ show size ++ ", " ++ show ops
   putStrLn $ "Generating " ++ show (length ps) ++ " candidates"
   putStrLn $ "Simplifies to " ++ show (length ss)
 
+  --mapM_ (print . printProgram) ss
+
   let go i = do
-        n <- randomRIO (1, 100) 
+        n <- randomRIO (1, 100)
         vs <- replicateM n randomIO
         let xs = [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ vs
         let res  = [ (map (eval p) xs, Endo (p:)) | p <- ss]
@@ -57,11 +64,23 @@ solve size ops = do
             freq = maximum $ map (length . retract) $ M.elems mm
         if freq <= mismatchTolerance
           then do
-            mapM_ print $ zip (M.keys mm) (map (head . retract) $ M.elems mm)
+            --let tt = map (retract . snd) $ reverse $ sortBy (compare `on` (length . retract . snd)) $ M.toList mm
+            --mapM_ (print . map printProgram) tt
             return $ Just $ Context (\vss -> printProgram $ ms M.! head (retract $ mm M.! vss)) xs
           else do
             if i > retryTimes
-              then return Nothing
+              then do
+                let tt = retract $ snd $ head $ reverse $ sortBy (compare `on` (length . retract . snd)) $ M.toList mm
+                putStrLn $ "Group size: " ++ show (length tt)
+                forM_ (zip [1..] tt) $ \(i, x) -> forM_ (zip [1..] tt) $ \(j, y) -> do
+                  when (i < j) $ do
+                    b <- x `equiv` y
+                    when b $ do
+                      putStrLn $ printProgram x
+                      putStrLn $ printProgram y
+                      putStrLn "==="
+
+                return Nothing
               else go (i + 1)
 
   go 0 :: IO (Maybe (Context [Word64] [Word64] String))
@@ -83,26 +102,22 @@ data Op = If0 | TFold | Fold0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus
 
 printProgram :: Program -> String
 printProgram (Program e) = "(lambda (x0) " ++ f e ++ ")" where
-  f (Constant n) | n == 0 || n == 1 = show n
+  f (Constant n) = show n
   f (Var ixx) = "x" ++ show ixx
   f (If c t ee) = "(if0 " ++ f c ++ " " ++ f t ++ " " ++ f ee ++ ")"
   f (Fold i j l v ee) = "(fold " ++ f l ++ " " ++ f v ++ " (lambda (x" ++ show i ++ " x" ++ show j ++ ") " ++ f ee ++ ")"
   f (Op1 opr ee) = "(" ++ g opr ++ " " ++ f ee ++ ")"
   f (Op2 opr e1 e2) = "(" ++ g opr ++ " " ++ f e1 ++ " " ++ f e2 ++ ")"
-  f _ = undefined
 
   g If0 = "if0"
   g Fold0 = "fold"
   g Not = "not"
-  g (Shl 1) = "shl1"
-  g (Shr 1) = "shr1"
-  g (Shr 4) = "shr4"
-  g (Shr 16) = "shr16"
+  g (Shl n) = "shl" ++ show n
+  g (Shr n) = "shr" ++ show n
   g And = "and"
   g Or = "or"
   g Xor = "xor"
   g Plus = "plus"
-  g _ = undefined
 
 canonic :: Program -> Program
 canonic (Program e) = Program $ canonical e
@@ -166,6 +181,11 @@ simplifyE (If p e1 e2) = case (simplifyE p, simplifyE e1, simplifyE e2) of
   (Constant 0, e1', _) -> e1'
   (Constant _, _, e2') -> e2'
   (_, e1', e2') | canonical e1' == canonical e2' -> e1'
+
+  (c', e1', _) | isZero c' -> e1'
+  (c', _, e2') | isNotZero c' -> e2'
+
+  (Var i, e1', e2') -> If (Var i) (subst i (Constant 0) e1') e2'
 
   (p', e1', e2') -> If p' e1' e2'
 
@@ -239,21 +259,20 @@ destructFold x y l v e = simplifyE e8
     l6 = Op2 And (Op1 (Shr 48) l') (Constant 255)
     l7 = Op1 (Shr 56) l'
     e0 = simplifyE v
-    e1 = subst x y l0 e0 e
-    e2 = subst x y l1 e1 e
-    e3 = subst x y l2 e2 e
-    e4 = subst x y l3 e3 e
-    e5 = subst x y l4 e4 e
-    e6 = subst x y l5 e5 e
-    e7 = subst x y l6 e6 e
-    e8 = subst x y l7 e7 e
+    e1 = subst x l0 $ subst y e0 e
+    e2 = subst x l1 $ subst y e1 e
+    e3 = subst x l2 $ subst y e2 e
+    e4 = subst x l3 $ subst y e3 e
+    e5 = subst x l4 $ subst y e4 e
+    e6 = subst x l5 $ subst y e5 e
+    e7 = subst x l6 $ subst y e6 e
+    e8 = subst x l7 $ subst y e7 e
 
-subst :: Int -> Int -> Expression -> Expression -> Expression -> Expression
-subst x y ex ey e = f e where
+subst :: Int -> Expression -> Expression -> Expression
+subst x ex e = f e where
   f (Constant c) = Constant c
   f (Var i)
     | i == x = ex
-    | i == y = ey
     | otherwise = Var i
   f (If xx yy zz) = If (f xx) (f yy) (f zz)
   f (Fold i j xx yy zz) = Fold i j (f xx) (f yy) (f zz)
@@ -271,6 +290,40 @@ lessThan ub e = case simplifyE e of
   Op2 Xor e1 e2 | lessThan (ub `div` 2) e1 && lessThan (ub `div` 2) e2 -> True
   Op2 Plus e1 e2 | lessThan (ub `div` 2) e1 && lessThan (ub `div` 2) e2 -> True
   _ -> False
+
+
+-- (Op1 (Shr 32) (Op1 (Shl 1) (Op1 Not (Var 0))))
+-- (Op1 (Shr 32) (Op1 Not (Op1 (Shl 1) (Var 0))))
+
+isZero, isNotZero :: Expression  -> Bool
+isZero e = all (\i -> testB e i == Just False) [0..63]
+isNotZero e = any (\i -> testB e i /= Just False) [0..63]
+
+testB :: Expression -> Int -> Maybe Bool
+testB (Constant c) i = Just $ c `testBit` i
+testB (Var _) _ = Nothing
+testB (If c t e) i
+  | isZero c = testB t i
+  | isNotZero c = testB e i
+  | otherwise = do
+    a <- testB t i
+    b <- testB e i
+    if a == b then Just a else Nothing
+testB (Op1 Not e) i = not <$> testB e i
+testB (Op1 (Shl n) e) i
+  | i < n = Just False
+  | otherwise = testB e (i - n)
+testB (Op1 (Shr n) e) i
+  | i >= 64 - n = Just False
+  | otherwise = testB e (i + n)
+testB (Op2 And l r) i =
+  (&&) <$> testB l i <*> testB r i
+testB (Op2 Or l r) i =
+  (||) <$> testB l i <*> testB r i
+testB (Op2 Xor l r) i =
+  (/=) <$> testB l i <*> testB r i
+testB (Op2 Plus _ _) _ =
+  Nothing -- TODO
 
 eval :: Program -> Word64 -> Word64
 eval (Program e) x = evalE e [x]
