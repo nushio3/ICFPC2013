@@ -5,8 +5,13 @@ import SRichBV (equiv)
 import Convert (readProgram, enrichProgram)
 import qualified BV as B
 
+import BV 
+
 main :: IO ()
 main = do
+  print $  exec (Program "x" (Fold (Var "x") C0 (Reducer "y" "z" (Op2 Plus (Var "y") (Var "z"))))) 1
+
+  print $ prog10
   print $ B.exec prog10 1
   
   

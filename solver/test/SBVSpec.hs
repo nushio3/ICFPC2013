@@ -55,7 +55,7 @@ spec = do
     forM_ programs $ \src -> do
       prop ("exec == sExec for " ++ src) $ \x -> 
         let prog = readProgram src in
-        trace (printf "prog %d = %d" x (exec prog x)) $
-        trace (printf "prog %d = %s" x (show $ unsafeSExec prog x)) $
+--         trace (printf "prog %d = %d" x (exec prog x)) $
+--         trace (printf "prog %d = %s" x (show $ unsafeSExec prog x)) $
         Just (exec prog x) == unsafeSExec prog x
 
