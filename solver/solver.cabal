@@ -106,3 +106,16 @@ executable rich-main
     , sbv == 2.10.*
     , reflection
     , text
+
+
+executable servey-gen
+  Hs-Source-Dirs: exe-src
+  Ghc-Options: -Wall -O2
+  Main-Is: servey-gen.hs
+  Other-Modules: 
+                    
+  Build-Depends: 
+      base ==4.*
+    , control-bool
+    , solver
+    , random
