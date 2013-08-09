@@ -71,7 +71,7 @@ data Expression =
   | Op2 Op Expression Expression
   deriving (Eq, Show, Ord)
 
-data Op = If0 | TFold | Fold0 | Not | Shl1 | Shr1 | Shr4 | Shr16 | And | Or | Xor | Plus
+data Op = If0 | TFold | Fold0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus
   deriving (Eq, Show, Ord)
 
 simplify :: Program -> Program
@@ -84,16 +84,49 @@ simplifyE (If p e1 e2) = case simplifyE p of
   Constant 0 -> simplifyE e1
   Constant _ -> simplifyE e2
   p' -> If p' (simplifyE e1) (simplifyE e2)
+
 simplifyE (Fold e1 e2 e3) =
   Fold (simplifyE e1) (simplifyE e2) (simplifyE e3)
-simplifyE (Op1 op e) = case simplifyE e of
-  Constant v -> Constant $ evalOp1 op v
-  e' -> Op1 op e'
-simplifyE (Op2 op e1 e2) = case (simplifyE e1, simplifyE e2) of
-  (Constant v1, Constant v2) -> Constant $ evalOp2 op v1 v2
-  (e1', e2') -> Op2 op e1' e2'
 
--- Shl1 Shl1
+simplifyE (Op1 op e) = case (op, simplifyE e) of
+  (_, Constant v) -> Constant $ evalOp1 op v
+
+  (Not, Op1 Not e') -> simplifyE e'
+
+  (Shl n, Op1 (Shl m) e') -> simplifyE $ Op1 (Shl $ n + m) e'
+  (Shl n, _) | n >= 64 -> Constant 0
+
+  (Shr n, Op1 (Shr m) e') -> simplifyE $ Op1 (Shr $ n + m) e'
+  (Shr n, _) | n >= 64 -> Constant 0
+
+  (_, e') -> Op1 op e'
+
+simplifyE (Op2 op e1 e2) = case (op, simplifyE e1, simplifyE e2) of
+  (_, Constant v1, Constant v2) -> Constant $ evalOp2 op v1 v2
+
+  (And, Constant 0, _) -> Constant 0
+  (And, _, Constant 0) -> Constant 0
+  (And, Constant v, e1') | v == complement 0 -> e1'
+  (And, e2', Constant v) | v == complement 0 -> e2'
+  (And, e1', e2') | e1' == e2' -> e1'
+
+  (Or, Constant 0, e2') -> e2'
+  (Or, e1', Constant 0) -> e1'
+  (Or, Constant v, _) | v == complement 0 -> Constant $ complement 0
+  (Or, _, Constant v) | v == complement 0 -> Constant $ complement 0
+  (Or, e1', e2') | e1' == e2' -> e1'
+
+  (Xor, Constant 0, e2') -> e2'
+  (Xor, e1', Constant 0) -> e1'
+  (Xor, Constant v, e2') | v == complement 0 -> simplifyE $ Op1 Not e2'
+  (Xor, e1', Constant v) | v == complement 0 -> simplifyE $ Op1 Not e1'
+  (Xor, e1', e2') | e1' == e2' -> Constant 0
+
+  (Plus, Constant 0, e2') -> e2'
+  (Plus, e1', Constant 0) -> e1'
+  (Plus, e1', e2') | e1' == e2' -> simplifyE $ Op1 (Shl 1) e1'
+
+  (_, e1', e2') -> Op2 op e1' e2'
 
 eval :: Program -> Word64 -> Word64
 eval (Program e) x = evalE e [x]
@@ -113,11 +146,9 @@ evalE (Op1 op e) env =
 evalE (Op2 op e1 e2) env =
   evalOp2 op (evalE e1 env) (evalE e2 env)
 
-evalOp1 Not   = complement
-evalOp1 Shl1  = (`shiftL` 1 )
-evalOp1 Shr1  = (`shiftR` 1 )
-evalOp1 Shr4  = (`shiftR` 4 )
-evalOp1 Shr16 = (`shiftR` 16)
+evalOp1 Not     = complement
+evalOp1 (Shl n) = (`shiftL` n)
+evalOp1 (Shr n) = (`shiftR` n)
 
 evalOp2 And  = (.&.)
 evalOp2 Or   = (.|.)
@@ -125,10 +156,10 @@ evalOp2 Xor  = xor
 evalOp2 Plus = (+)
 
 toOp "not"   = Not
-toOp "shl1"  = Shl1
-toOp "shr1"  = Shr1
-toOp "shr4"  = Shr4
-toOp "shr16" = Shr16
+toOp "shl1"  = Shl 1
+toOp "shr1"  = Shr 1
+toOp "shr4"  = Shr 4
+toOp "shr16" = Shr 16
 toOp "and"   = And
 toOp "or"    = Or
 toOp "xor"   = Xor
@@ -139,10 +170,8 @@ toOp "tfold" = TFold
 
 isOp1 :: Op -> Bool
 isOp1 Not   = True
-isOp1 Shl1  = True
-isOp1 Shr1  = True
-isOp1 Shr4  = True
-isOp1 Shr16 = True
+isOp1 (Shl _) = True
+isOp1 (Shr _) = True
 isOp1 _ = False
 
 isOp2 :: Op -> Bool
