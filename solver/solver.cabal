@@ -43,6 +43,7 @@ library
     , http-types
     , reflection
     , http-conduit
+    , mtl
   Ghc-Options: -Wall -O2
 
 Test-Suite spec

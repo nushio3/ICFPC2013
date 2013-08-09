@@ -16,6 +16,9 @@ import Data.Text (Text)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import Data.Word
+import Control.Monad
+import Control.Monad.Trans
+import Network.HTTP.Types.Status
 
 newtype Token = Token { unToken :: String }
 
@@ -23,10 +26,18 @@ endpoint :: Given Token => String -> String
 endpoint path = "http://icfpc2013.cloudapp.net/" ++ path ++ "?auth=" ++ unToken given
 
 post :: Given Token => String -> Value -> IO Value
-post p body = withSocketsDo $ withManager $ \man -> do
+post p body = withSocketsDo $ withManager f where
+    f man = do
     req <- parseUrl (endpoint p)
-    httpLbs req { method = "POST", requestBody = RequestBodyLBS (JSON.encode body), responseTimeout = Just (30*10^6) } man
-        >>= maybe (fail "JSON decoding error") return . JSON.decode .responseBody
+    res <- httpLbs req { method = "POST", requestBody = RequestBodyLBS (JSON.encode body), responseTimeout = Just (30*10^6), checkStatus = \_ _ _ -> Nothing } man
+    let code = statusCode $ responseStatus res
+    if code == 429
+      then do
+        liftIO $ putStrLn "retrying..."
+        f man -- too many request, retry
+      else if code >= 400 && code < 500
+        then fail $ "HTTP Error " ++ show (responseStatus res) -- other response
+        else maybe (fail "JSON decoding error") return . JSON.decode . responseBody $ res
 
 myproblems :: Given Token => IO [Problem]
 myproblems = do

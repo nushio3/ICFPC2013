@@ -316,10 +316,16 @@ testB (Op1 (Shl n) e) i
 testB (Op1 (Shr n) e) i
   | i >= 64 - n = Just False
   | otherwise = testB e (i + n)
-testB (Op2 And l r) i =
-  (&&) <$> testB l i <*> testB r i
-testB (Op2 Or l r) i =
-  (||) <$> testB l i <*> testB r i
+testB (Op2 And l r) i = case (testB l i, testB r i) of
+  (Just True, Just True) -> Just True
+  (Just False, _) -> Just False
+  (_, Just False) -> Just False
+  _ -> Nothing
+testB (Op2 Or l r) i = case (testB l i, testB r i) of
+  (Just True, _) -> Just True
+  (_, Just True) -> Just True
+  (Just False, Just False) -> Just False
+  _ -> Nothing
 testB (Op2 Xor l r) i =
   (/=) <$> testB l i <*> testB r i
 testB (Op2 Plus _ _) _ =
