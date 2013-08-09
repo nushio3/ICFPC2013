@@ -66,6 +66,7 @@ exprSize (Op1 _ e0) = 1 + exprSize e0
 exprSize (Op2 _ e0 e1) = 1 + exprSize e0 + exprSize e1
 exprSize C0 = 1
 exprSize C1 = 1
+exprSize (Var _) = 1
 
 programSize :: Program -> Int
 programSize (Program _ e) = 1 + exprSize e
