@@ -15,7 +15,9 @@ build-type:          Simple
 cabal-version:       >=1.8
 
 library
-  exposed-modules:   BV
+  exposed-modules:   
+    BV
+    SBV
   hs-source-dirs:    src/  
   -- other-modules:       
   build-depends:      
