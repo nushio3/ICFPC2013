@@ -4,18 +4,17 @@ module SBVSpec (spec) where
 import Control.Monad
 import Data.List (isInfixOf, isPrefixOf)
 import Data.Maybe
-import Data.Monoid (mempty)
 import Data.SBV
 import System.IO.Unsafe
 import System.Environment (lookupEnv)
 import Test.Hspec
 import Test.Hspec.QuickCheck
-import Text.Trifecta (parseString, Result(..))
 
 import Safe
 
 import BV
 import SBV
+import Util
 
 unsafeSExec ::  Program -> BitVector -> Maybe BitVector
 unsafeSExec prog i = unsafePerformIO $ do
@@ -34,12 +33,6 @@ unsafeSExec prog i = unsafePerformIO $ do
         maybeToList $ readMay val
   return $ headMay rcand
 
-s2p :: String -> Program
-s2p str = 
-  case parseString parseProgram mempty str of
-    Success x -> x
-    Failure doc -> error $ show doc
-  
 programs :: [String]
 programs = unsafePerformIO $ do
   env <- lookupEnv "test_file"
@@ -58,7 +51,6 @@ spec = do
   describe "sbv converter" $ do
     forM_ programs $ \src -> do
       prop ("exec == sExec for " ++ src) $ \x -> 
-        let prog = s2p src in
+        let prog = readProgram src in
         Just (exec prog x) == unsafeSExec prog x
-
 
