@@ -12,6 +12,8 @@ import Safe
 
 import qualified BV as B
 import qualified RichBV as R
+import qualified SBV as B
+import qualified SRichBV as R
 import Convert
 import TestInputs
   
