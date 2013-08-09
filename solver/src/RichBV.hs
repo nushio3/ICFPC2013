@@ -14,41 +14,43 @@ import Debug.Trace (trace)
 import Data.Word
 import Data.Text.Lens
 import Data.Bits
+import Data.Monoid
 import System.Random
 import Text.Printf
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
-
-solve' :: Value  -> IO (Maybe ([Word64], [Word64] -> String))
+import Control.Lens.Internal.Context
+{-
+solve' :: Value -> IO (Maybe ([Word64], [Word64] -> String))
 solve' p = do
   let size = p ^?! key "size"._Integer.from enum
       ops  = p ^.. key "operators"._Array.traverse._String.unpacked
   solve size ops
+-}
 
-solve :: Int -> [String] -> IO (Maybe ([Word64], [Word64] -> String))
+solve :: Int -> [String] -> IO (Maybe (Context [Word64] [Word64] String))
 solve size ops = do
-  let ps = gen size ops 
+  let ps = genProgram (fromIntegral size) $ map toOp ops
       qs = map (canonic.simplify.moveOp2P.moveIfP.simplify.canonic) ps
       ms = M.fromList $ zip qs ps
       ss = M.keys ms
-  putStrLn $ "generate " ++ show (length ps) ++ " candidates"
-  putStrLn $ "simplify to " ++ show (length ss)
-  -- mapM_ print ss
+  putStrLn $ "Generating " ++ show (length ps) ++ " candidates"
+  putStrLn $ "Simplifies to " ++ show (length ss)
 
   let go i = do
         n <- randomRIO (1, 100) 
         vs <- replicateM n randomIO
         let xs = [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ vs
-        let res  = [ (map (eval p) xs, [p]) | p <- ss]
-            mm   = M.fromListWith (++) res
-            freq = maximum $ map (length . snd) $ M.toList mm
+        let res  = [ (map (eval p) xs, Endo (p:)) | p <- ss]
+            mm   = M.fromListWith mappend res
+            freq = maximum $ map (length . flip appEndo []) $ M.elems mm
         if freq <= 60
-          then return $ Just (xs, \vs -> printProgram $ ms M.! (head $ mm M.! vs))
+          then return $ Just $ Context (\vs -> printProgram $ ms M.! head (appEndo (mm M.! vs) [])) xs
           else do
             if i > 1000
               then do
-                mapM_ print ss
-                print $ reverse $ sort $ M.elems mm
+--                mapM_ print ss
+--                print $ reverse $ sort $ M.elems mm
                 return Nothing
               else go (i + 1)
 --            when (i > 1000) $ do
@@ -56,10 +58,7 @@ solve size ops = do
 --              error "hoge"
 --            go $ i + 1
 
-  go 0 :: IO (Maybe ([Word64], [Word64] -> String))
-
-gen size ops = do
-  genProgram (fromIntegral size) $ map toOp ops
+  go 0 :: IO (Maybe (Context [Word64] [Word64] String))
 
 data Program = Program Expression
   deriving (Eq, Show, Ord, Read)
