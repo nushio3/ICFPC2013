@@ -16,10 +16,10 @@ main :: IO ()
 main = do
   hspec $ do
     EvalSpec.spec
---     ConvertSpec.spec
---     SimplifySpec.spec    
---     SBVSpec.spec
---     SRichBVSpec.spec    
---     ProvenSpec.spec        
+    ConvertSpec.spec
+    SimplifySpec.spec    
+    SBVSpec.spec
+    SRichBVSpec.spec    
+    ProvenSpec.spec        
 
 
