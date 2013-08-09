@@ -56,7 +56,7 @@ parseProgram = parens $ do
 
 exprSize :: Expr -> Int
 exprSize (If0 a b c) = 1 + exprSize a + exprSize b + exprSize c
-exprSize (Fold a b (Reducer _ _ c)) = 1 + exprSize a + exprSize b + exprSize c
+exprSize (Fold a b (Reducer _ _ c)) = 2 + exprSize a + exprSize b + exprSize c
 exprSize (Op1 _ e0) = 1 + exprSize e0
 exprSize (Op2 _ e0 e1) = 1 + exprSize e0 + exprSize e1
 exprSize C0 = 1
