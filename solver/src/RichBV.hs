@@ -12,16 +12,23 @@ import Control.Applicative
 import Control.Monad
 import Debug.Trace (trace)
 import Data.Word
+import Data.Text.Lens
 import Data.Bits
 import System.Random
 import Text.Printf
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 
-solve problem = do
-  L.putStrLn $ encode problem
-  let ps = gen problem
-      ss = S.toList $ S.fromList $ map (canonic.simplify.moveIfP.simplify.canonic) ps
+solve' :: Value  -> IO (Maybe [Word64])
+solve' p = do
+  let size = p ^?! key "size"._Integer.from enum
+      ops  = p ^.. key "operators"._Array.traverse._String.unpacked
+  solve size ops
+
+solve :: Int -> [String] -> IO (Maybe [Word64])
+solve size ops = do
+  let ps = gen size ops 
+      ss = S.toList $ S.fromList $ map (canonic.simplify.moveOp2P.moveIfP.simplify.canonic) ps
   putStrLn $ "generate " ++ show (length ps) ++ " candidates"
   putStrLn $ "simplify to " ++ show (length ss)
   -- mapM_ print ss
@@ -34,9 +41,14 @@ solve problem = do
             mm   = M.fromListWith (+) $ map (\x -> (x, 1)) res
             freq = maximum $ map snd $ M.toList mm
         if freq <= 60
-          then return xs
+          then return $ Just xs
           else do
-            if i > 1000 then mapM_ print ss >> return [] else go (i + 1)
+            if i > 1000
+              then do
+                mapM_ print ss
+                print $ reverse $ sort $ M.elems mm
+                return Nothing
+              else go (i + 1)
 --            when (i > 1000) $ do
 --              print $ zip xs $ snd $ maximum $ map (\(a,b)->(b,a)) $ M.toList mm
 --              error "hoge"
@@ -45,12 +57,10 @@ solve problem = do
   ans <- go 0
   print ans
 
-  putStrLn ""
+  return ans
 
-gen p = do
-  let size = p ^?! key "size"._Integer
-      ops  = p ^.. key "operators"._Array.traverse._String.to toOp
-  genProgram (fromIntegral size) ops
+gen size ops = do
+  genProgram (fromIntegral size) $ map toOp ops
 
 data Program = Program Expression
   deriving (Eq, Show, Ord, Read)
@@ -92,6 +102,31 @@ moveIf (Op2 op e1 e2) = case (moveIf e1, moveIf e2) of
   (If p t e, e2') -> moveIf $ If p (Op2 op t e2') (Op2 op e e2')
   (e1', If p t e) -> moveIf $ If p (Op2 op e1' t) (Op2 op e1' e)
   (e1', e2') -> Op2 op e1 e2
+
+moveOp2P :: Program -> Program
+moveOp2P (Program e) = Program $ moveOp2 e
+
+moveOp2 :: Expression -> Expression
+moveOp2 (If p t e) = If (moveOp2 p) (moveOp2 t) (moveOp2 e)
+moveOp2 (Op2 op e1 e2) = Op2 op (moveOp2 e1) (moveOp2 e2)
+moveOp2 (Op1 Not e) = case moveOp2 e of
+  Op2 And  e1 e2 -> Op2 Or (moveOp2 $ Op1 Not e1) (moveOp2 $ Op1 Not e2)
+  Op2 Or   e1 e2 -> Op2 And (moveOp2 $ Op1 Not e1) (moveOp2 $ Op1 Not e2)
+  Op2 Xor  e1 e2 -> Op2 Xor (moveOp2 $ Op1 Not $ min e1 e2) (max e1 e2)
+  Op2 Plus e1 e2 -> Op2 Plus (Constant 1) $ Op2 Plus (moveOp2 $ Op1 Not e1) (moveOp2 $ Op1 Not e2)
+  e' -> Op1 Not e'
+moveOp2 (Op1 (Shl n) e) = case moveOp2 e of
+  Op2 And  e1 e2 -> Op2 And (moveOp2 $ Op1 (Shl n) e1) (moveOp2 $ Op1 (Shl n) e2)
+  Op2 Or   e1 e2 -> Op2 Or  (moveOp2 $ Op1 (Shl n) e1) (moveOp2 $ Op1 (Shl n) e2)
+  Op2 Xor  e1 e2 -> Op2 Xor (moveOp2 $ Op1 (Shl n) e1) (moveOp2 $ Op1 (Shl n) e2)
+  Op2 Plus e1 e2 -> Op2 Plus (moveOp2 $ Op1 (Shl n) e1) (moveOp2 $ Op1 (Shl n) e2)
+  e' -> Op1 (Shl n) e'
+moveOp2 (Op1 (Shr n) e) = case moveOp2 e of
+  Op2 And  e1 e2 -> Op2 And (moveOp2 $ Op1 (Shr n) e1) (moveOp2 $ Op1 (Shr n) e2)
+  Op2 Or   e1 e2 -> Op2 Or  (moveOp2 $ Op1 (Shr n) e1) (moveOp2 $ Op1 (Shr n) e2)
+  Op2 Xor  e1 e2 -> Op2 Xor (moveOp2 $ Op1 (Shr n) e1) (moveOp2 $ Op1 (Shr n) e2)
+  e' -> Op1 (Shr n) e'
+moveOp2 e = e
 
 simplify :: Program -> Program
 simplify (Program e) = Program $ simplifyE e

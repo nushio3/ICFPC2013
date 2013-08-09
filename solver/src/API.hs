@@ -1,4 +1,7 @@
 {-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+
+module API where
+
 import Network.HTTP.Conduit
 import Data.Reflection
 import Control.Lens
