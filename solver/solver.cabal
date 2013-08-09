@@ -67,10 +67,9 @@ Test-Suite spec
 --   Ghc-Options: -Wall -threaded 
 --   Main-Is: doctests.hs
 -- 
---   
--- 
 --   Build-Depends:
 --       base
+--     , sbv >= 2.10
 --     , directory >= 1.1
 --     , filepath >= 1.2
 --     , MissingH >= 1.1

@@ -31,6 +31,9 @@ solve' p = do
   solve size ops
 
 
+-- >>> prove $ forAll_ $ \x -> x*2 .== x+(x :: SWord64)
+-- Q.E.D.
+
 mismatchTolerance :: Int
 mismatchTolerance = 60
 
