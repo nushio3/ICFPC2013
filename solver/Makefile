@@ -1,4 +1,5 @@
 all: build
 
 build: 
-	cabal-dev install
+	cabal-dev install --enable-tests
+
