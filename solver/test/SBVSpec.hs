@@ -14,48 +14,21 @@ import Safe
 
 import BV
 import SBV
+import SBVTools (unSymbolM)
 import Convert
+import TestInputs
 
 import Debug.Trace(trace)
 import Text.Printf
 
-unsafeSExec ::  Program -> BitVector -> Maybe BitVector
-unsafeSExec prog i = unsafePerformIO $ do
-  let rvSymbol = "returnValue"
-  resp <- sat $ do
-    rv0 <- sExec prog $ fromIntegral i
-    rv1 <- symbolic rvSymbol
-    return $ rv0 .== rv1
-  let sresp :: String
-      sresp = show resp
-  let rcand :: [BitVector]
-      rcand = do -- list monad
-        let True = ("Satisfiable." `isPrefixOf` sresp)
-        rvLine <- filter (isInfixOf rvSymbol) $ lines sresp
-        let (_:_: val : _) = words $ rvLine
-        maybeToList $ readMay val
-  return $ headMay rcand
-
-programs :: [String]
-programs = unsafePerformIO $ do
-  env <- lookupEnv "test_file"
-  case env of
-    Nothing -> return defs
-    Just fn -> do
-      xs <- readFile fn
-      return $ filter (not . null) $ lines xs
-  where
-    defs = [ "(lambda (x) x)"
-           , "(lambda (x) (fold x 0 (lambda (y z) (plus y z))))"
-           ]  
   
 spec :: Spec
 spec = do
-  describe "sbv spec" $ do
+  describe "BV --> SBV" $ do
     forM_ programs $ \src -> do
       prop ("exec == sExec for " ++ src) $ \x -> 
         let prog = readProgram src in
 --         trace (printf "prog %d = %d" x (exec prog x)) $
 --         trace (printf "prog %d = %s" x (show $ unsafeSExec prog x)) $
-        Just (exec prog x) == unsafeSExec prog x
+        Just (exec prog x) == unSymbolM (sExec prog) x
 

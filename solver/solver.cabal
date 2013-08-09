@@ -20,6 +20,8 @@ library
     SBV
     RichBV
     SRichBV
+
+    SBVTools
     Convert
     API
 
@@ -33,6 +35,7 @@ library
     , lens ==3.9.*
     , lens-aeson
     , random
+    , safe
     , sbv == 2.10.*
     , trifecta ==1.1.*
     , text

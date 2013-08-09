@@ -5,14 +5,19 @@ import Test.Hspec
 import Test.Hspec.QuickCheck
 
 import qualified SBVSpec
+import qualified SRichBVSpec
 import qualified ConvertSpec
 import qualified SimplifySpec
+
+import qualified ProvenSpec
 
 main :: IO ()
 main = do
   hspec $ do
-    SimplifySpec.spec    
     ConvertSpec.spec
+    SimplifySpec.spec    
     SBVSpec.spec
+    SRichBVSpec.spec    
+    ProvenSpec.spec        
 
 

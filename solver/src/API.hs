@@ -56,6 +56,16 @@ guess (Guess i p) = do
         & _Object . at "program" ?~ _String # p)
     return $ GuessResponse (res ^?! ix "status" . _String . to toGuessStatus) (res ^? ix "values" >>= preview textList) (res ^? ix "message" . _String)
 
+train :: Given Token => TrainRequest -> IO TrainingProblem
+train (TrainRequest size ops) = do
+    res <- post "guess" (JSON.emptyObject
+        & _Object . at "size" ?~ _Integer # toEnum size
+        & _Object . at "operators" ?~ _Array . from vector # map (_String #) ops)
+    return $ TrainingProblem (res ^?! ix "challenge" . _String)
+        (res ^?! ix "id" . _String)
+        (res ^?! ix "size" . _Integer . from enum)
+        (res ^.. ix "operators" . _Array . from vector . traverse . _String )
+
 toGuessStatus :: Text -> GuessStatus
 toGuessStatus "win" = GuessWin
 toGuessStatus "mismatch" = GuessMismatch
@@ -96,7 +106,7 @@ data GuessResponse = GuessResponse
     }
 data TrainRequest = TrainRequest
     { trainSize :: Int
-    , trainOperators :: Text
+    , trainOperators :: [Text]
     }
 data TrainingProblem = TrainingProblem
     { trainingChallenge :: Text
