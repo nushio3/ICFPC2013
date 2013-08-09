@@ -43,7 +43,9 @@ solve size ops = do
             mm   = M.fromListWith (++) res
             freq = maximum $ map (length . snd) $ M.toList mm
         if freq <= 60
-          then return $ Just (xs, \vs -> printProgram $ ms M.! (head $ mm M.! vs))
+          then do
+            mapM_ print $ zip (M.keys mm) (map head $ M.elems mm)
+            return $ Just (xs, \vs -> printProgram $ ms M.! (head $ mm M.! vs))
           else do
             if i > 1000
               then do

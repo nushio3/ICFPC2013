@@ -16,7 +16,7 @@ import Text.Printf
 import SRichBV (equiv)
 import API
 
-{-}
+{-
 main = do
   con <- L.getContents
   let Just objs = decode con :: Maybe [Value]
@@ -26,9 +26,11 @@ main = do
 
 main = do
   give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ do
-    TrainingProblem _prog tid tsize tops <- train $ TrainRequest 5 []
+    TrainingProblem _prog tid tsize tops <- train $
+      TrainRequest 9 []
     print (_prog, tid, tsize, tops)
     Just (query, lu) <- solve tsize $ map T.unpack tops
+    print query
     EvalResponse estat (Just eout) emsg <- API.eval $ EvalRequest (Just tid) Nothing $ map (T.pack . printf "0x%016X") query
     print (estat, eout, emsg)
     putStrLn $ "my guessed answer: " ++ lu eout
