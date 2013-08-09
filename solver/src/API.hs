@@ -96,7 +96,7 @@ data EvalRequest = EvalRequest
 data EvalResponse = EvalResponse
     { evalStatus :: EvalStatus
     , evalOutputs :: Maybe [Word64]
-    , _evalMessage :: Maybe Text
+    , evalMessage :: Maybe Text
     } deriving (Show)
 data Guess = Guess
     { guessId :: Text
