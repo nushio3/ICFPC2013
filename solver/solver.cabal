@@ -19,6 +19,7 @@ library
     BV
     RichBV
     SBV
+    SRichBV
     Util
   hs-source-dirs:    src/  
   -- other-modules:       
