@@ -26,4 +26,7 @@ main = do
   let files = filesP 
 
   putStrLn $ "testing: " ++ unwords files
-  doctest files
+  doctest $ 
+    ["--optghc=-Lcabal-dev/lib",
+     "--optghc=-package-conf=cabal-dev/packages-7.6.3.conf"]
+    ++ files
