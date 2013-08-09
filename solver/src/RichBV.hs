@@ -20,13 +20,19 @@ import Text.Printf
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 import Control.Lens.Internal.Context
-{-
+
 solve' :: Value -> IO (Maybe ([Word64], [Word64] -> String))
 solve' p = do
   let size = p ^?! key "size"._Integer.from enum
       ops  = p ^.. key "operators"._Array.traverse._String.unpacked
   solve size ops
--}
+
+
+mismatchTolerance :: Int
+mismatchTolerance = 60
+
+retryTimes :: Int
+retryTimes = 1000
 
 solve :: Int -> [String] -> IO (Maybe (Context [Word64] [Word64] String))
 solve size ops = do
@@ -44,19 +50,12 @@ solve size ops = do
         let res  = [ (map (eval p) xs, Endo (p:)) | p <- ss]
             mm   = M.fromListWith mappend res
             freq = maximum $ map (length . flip appEndo []) $ M.elems mm
-        if freq <= 60
+        if freq <= mismatchTolerance
           then return $ Just $ Context (\vs -> printProgram $ ms M.! head (appEndo (mm M.! vs) [])) xs
           else do
-            if i > 1000
-              then do
---                mapM_ print ss
---                print $ reverse $ sort $ M.elems mm
-                return Nothing
+            if i > retryTimes
+              then return Nothing
               else go (i + 1)
---            when (i > 1000) $ do
---              print $ zip xs $ snd $ maximum $ map (\(a,b)->(b,a)) $ M.toList mm
---              error "hoge"
---            go $ i + 1
 
   go 0 :: IO (Maybe (Context [Word64] [Word64] String))
 
@@ -180,24 +179,36 @@ simplifyE (Op1 op e) = case (op, simplifyE e) of
 simplifyE (Op2 op e1 e2) = case (op, simplifyE e1, simplifyE e2) of
   (_, Constant v1, Constant v2) -> Constant $ evalOp2 op v1 v2
 
+  -- And absorption
   (And, Constant 0, _) -> Constant 0
   (And, _, Constant 0) -> Constant 0
+  (And, e1', e2') | e1' == e2' -> e1'
+  
+  -- And identity
   (And, Constant v, e1') | v == complement 0 -> e1'
   (And, e2', Constant v) | v == complement 0 -> e2'
-  (And, e1', e2') | e1' == e2' -> e1'
-
+  
+  -- Or identity
   (Or, Constant 0, e2') -> e2'
   (Or, e1', Constant 0) -> e1'
+  
+  -- Or absorption
   (Or, Constant v, _) | v == complement 0 -> Constant $ complement 0
   (Or, _, Constant v) | v == complement 0 -> Constant $ complement 0
   (Or, e1', e2') | e1' == e2' -> e1'
 
+  -- Xor identity
   (Xor, Constant 0, e2') -> e2'
   (Xor, e1', Constant 0) -> e1'
+  
+  -- Xor complement
   (Xor, Constant v, e2') | v == complement 0 -> simplifyE $ Op1 Not e2'
   (Xor, e1', Constant v) | v == complement 0 -> simplifyE $ Op1 Not e1'
+  
+  -- Xor cancellation
   (Xor, e1', e2') | e1' == e2' -> Constant 0
 
+  -- Plus dentity
   (Plus, Constant 0, e2') -> e2'
   (Plus, e1', Constant 0) -> e1'
   (Plus, e1', e2') | e1' == e2' -> simplifyE $ Op1 (Shl 1) e1'
