@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, LambdaCase #-}
+{-# LANGUAGE OverloadedStrings, LambdaCase, FlexibleContexts #-}
 import RichBV
 
 import qualified Data.ByteString.Lazy.Char8 as L
@@ -24,17 +24,25 @@ main = do
   mapM_ solve sorted
 -}
 
-main = getArgs >>= \case
-    (level : _) -> give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ do
-        TrainingProblem _prog tid tsize tops <- train $ TrainRequest (read level) []
-        print (_prog, tid, tsize, tops)
-        Just (Context restore query) <- solve tsize $ map T.unpack tops
-        EvalResponse estat (Just eout) emsg <- API.eval $ EvalRequest (Just tid) Nothing $ map (T.pack . printf "0x%016X") query
-        print (estat, eout, emsg)
-        let answer = restore eout
-        putStrLn $ "My answer: " ++ answer
-        resp <- guess $ Guess tid $ T.pack answer
-        print resp
+solveAndAnswer :: Given Token => T.Text -> Int -> [T.Text] -> IO (String, GuessResponse)
+solveAndAnswer tid size ops = do
+    Just (Context restore query) <- solve size $ map T.unpack ops
+    EvalResponse estat (Just eout) emsg <- API.eval
+        $ EvalRequest (Just tid) Nothing
+        $ map (T.pack . printf "0x%016X") query
+    let answer = restore eout
+    res <- guess $ Guess tid $ T.pack answer
+    return (answer, res)
 
-programs :: IO [Program]
-programs = map read . lines <$> getContents
+main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >>= \case
+    ("training" : level : _) -> do
+        TrainingProblem prog ident size ops <- train $ TrainRequest (read level) []
+        (answer, res) <- solveAndAnswer ident size ops
+        putStrLn $ "Expected answer: " ++ T.unpack prog
+        putStrLn $ "Your answer: " ++ answer
+        putStrLn $ "Result: " ++ show res
+    ("submit" : _) -> do
+        putStrLn "This feature is locked"
+
+-- programs :: IO [Program]
+-- programs = map read . lines <$> getContents

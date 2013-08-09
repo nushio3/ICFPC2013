@@ -34,6 +34,7 @@ epFiles =
   , "../eval-data/eval5.txt"
   , "../eval-data/eval6.txt"
   , "../eval-data/eval7.txt"
+  , "../eval-data/eval8.txt"
   ]
   
 readEPFiles :: FilePath -> IO (String, [(BitVector, BitVector)])

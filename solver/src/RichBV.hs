@@ -14,6 +14,9 @@ import Data.Monoid
 import System.Random
 import qualified Data.Map.Strict as M
 
+-- $setup
+-- >>> import Data.SBV
+
 solve' :: Value -> IO (Maybe (Context [Word64] [Word64] String))
 solve' p = do
   let size = p ^?! key "size"._Integer.from enum
