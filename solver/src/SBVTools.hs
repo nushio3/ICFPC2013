@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 module SBVTools where
 
 import Data.List (isPrefixOf, isInfixOf)
@@ -46,4 +47,11 @@ unSymbol prog i = unsafePerformIO $ do
     
 
     
-    
+unPredicate :: Predicate -> Maybe Bool
+unPredicate pred0 = unsafePerformIO $ do
+  ret <- prove pred0
+  let strRet = show ret
+  return $ 
+    if | "Q.E.D." `isPrefixOf` strRet       -> Just True   
+       | "Falsifiable." `isPrefixOf` strRet -> Just False
+       | otherwise                          -> Nothing
