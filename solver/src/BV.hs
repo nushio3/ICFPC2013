@@ -39,16 +39,16 @@ parseExpr = choice [try $ parens $ symbol "if0" >> If0 <$> parseExpr <*> parseEx
     , try $ parens $ symbol "fold" >> Fold <$> parseExpr <*> parseExpr <*> parseReducer
     , try $ parens $ Op2 <$> parseOp2 <*> parseExpr <*> parseExpr
     , try $ parens $ Op1 <$> parseOp1 <*> parseExpr
-    , token $ C0 <$ symbol "0"
-    , token $ C1 <$ symbol "1"
+    , try $ token $ C0 <$ symbol "0"
+    , try $ token $ C1 <$ symbol "1"
     , try $ Var <$> identifier
     ]
 
 parseOp1 = token $ choice [Not <$ symbol "not"
+    , Shr16 <$ symbol "shr16"
     , Shl1 <$ symbol "shl1"
     , Shr1 <$ symbol "shr1"
-    , Shr4 <$ symbol "shr4"
-    , Shr16 <$ symbol "shr16" ]
+    , Shr4 <$ symbol "shr4" ]
 
 parseOp2 = token $ choice [And <$ symbol "and", Or <$ symbol "or", Xor <$ symbol "xor", Plus <$ symbol "plus"]
 
