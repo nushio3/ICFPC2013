@@ -1,11 +1,9 @@
-module BV where
-
 import Text.Trifecta
 import Control.Applicative
 import Control.Lens
 import Data.Word
 import Data.Bits
-import qualified Data.Map as M
+import qualified Data.Map as Map
 
 identifier = token $ some lower
 
@@ -75,7 +73,7 @@ type BitVector = Word64
 exec :: Program -> BitVector -> BitVector
 exec (Program x e) i = eval (Map.singleton x i) e
 
-eval :: M.Map Idfr BitVector -> Expr -> BitVector
+eval :: Map.Map Idfr BitVector -> Expr -> BitVector
 eval m (If0 a b c) = if eval m a == 0 then eval m b else eval m c
 eval m (Fold a b (Reducer v w e)) = foldr (\x y -> eval (m & ix v .~ x & ix w .~ y) e) (eval m b)
     $ [shiftR (eval m a) (i * 8) .&. 0xFF | i <- [0..7]]
@@ -88,6 +86,6 @@ eval m (Op2 Plus a b) = eval m a + eval m b
 eval m (Op2 And a b) = eval m a .&. eval m b
 eval m (Op2 Or a b) = eval m a .|. eval m b
 eval m (Op2 Xor a b) = eval m a `xor` eval m b
-eval m (Var v) = m M.! v
+eval m (Var v) = m Map.! v
 eval _ C0 = 0
 eval _ C1 = 1
