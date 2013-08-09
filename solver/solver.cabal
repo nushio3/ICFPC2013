@@ -17,10 +17,11 @@ cabal-version:       >=1.8
 library
   exposed-modules:   
     BV
-    RichBV
     SBV
+    RichBV
     SRichBV
-    Util
+    Convert
+
   hs-source-dirs:    src/  
   -- other-modules:       
   build-depends:      

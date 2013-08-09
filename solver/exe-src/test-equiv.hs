@@ -2,7 +2,7 @@ module Main where
 
 import Data.SBV
 import SBV (sExec)
-import Util (readProgram)
+import Convert (readProgram)
 
 main :: IO ()
 main = do

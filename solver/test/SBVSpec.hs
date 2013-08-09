@@ -14,7 +14,7 @@ import Safe
 
 import BV
 import SBV
-import Util
+import Convert
 
 unsafeSExec ::  Program -> BitVector -> Maybe BitVector
 unsafeSExec prog i = unsafePerformIO $ do
