@@ -6,9 +6,11 @@ import Data.SBV
 
 type SBitVector = SWord64
 
-execSBV :: Program -> (SBitVector -> Symbolic SBitVector)
-execSBV (Program x e) i = 
-  evalSBV (Map.singleton x i) e
+sExec :: Program -> (SBitVector -> Symbolic SBitVector)
+sExec (Program x e) i = 
+  sEval (Map.singleton x i) e
   
-evalSBV :: Map.Map Idfr SBitVector -> Expr -> Symbolic SBitVector
-evalSBV = undefined
+sEval :: Map.Map Idfr SBitVector -> Expr -> Symbolic SBitVector
+sEval m (Var v) = return $ m Map.! v
+sEval _ _= undefined
+
