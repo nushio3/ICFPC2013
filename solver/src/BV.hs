@@ -1,8 +1,10 @@
+module BV where
+
 import Text.Trifecta
 import Control.Applicative
 import Control.Lens
 import Data.Word
-import qualfoData.Map as M
+import qualified Data.Map as M
 
 identifier = token $ some lower
 
