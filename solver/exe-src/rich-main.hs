@@ -30,6 +30,7 @@ solveAndAnswer tid size ops = do
     EvalResponse estat (Just eout) emsg <- API.eval
         $ EvalRequest (Just tid) Nothing
         $ map (T.pack . printf "0x%016X") query
+    putStrLn $ "query: " ++ show query
     let answer = restore eout
     res <- guess $ Guess tid $ T.pack answer
     return (answer, res)
@@ -43,6 +44,9 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
         putStrLn $ "Result: " ++ show res
     ("submit" : _) -> do
         putStrLn "This feature is locked"
+    ("hoge" : _) -> do
+      let progs = genProgram 9 $ map toOp ["and","if0","or"]
+      mapM_ (\p -> putStrLn $ printProgram p ++ " -> " ++ printProgram ((canonic.simplify.moveOp2P.moveIfP.simplify.canonic $ p))) progs
 
 -- programs :: IO [Program]
 -- programs = map read . lines <$> getContents

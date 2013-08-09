@@ -100,7 +100,7 @@ canonic (Program e) = Program $ canonical e
 canonical :: Expression -> Expression
 canonical (Constant c) = Constant c
 canonical (Var n) = Var n
-canonical (If p e1 e2) = If p (min e1 e2) (max e1 e2)
+canonical (If p e1 e2) = If p e1 e2
 canonical (Fold x y v e1 e2) = Fold x y v (min e1 e2) (max e1 e2)
 canonical (Op1 opr e) = Op1 opr e
 canonical (Op2 opr e1 e2) = Op2 opr (min e1 e2) (max e1 e2)
@@ -335,9 +335,10 @@ genExpression size _ _ _
 genExpression size ops unused vars
   | TFold `elem` unused = do
     let u0 = unused \\ [TFold, Fold0]
-    (s1, u1, e1) <- genExpression (size - 2) ops u0 vars
-    (s2, u2, e2) <- genExpression (size - 2 - s1) ops u1 vars
-    (s3, u3, e3) <- genExpression (size - 2 - s1 - s2) ops u2 (vars + 2)
+        o0 = ops \\ [TFold, Fold0]
+    (s1, u1, e1) <- genExpression (size - 2) o0 u0 vars
+    (s2, u2, e2) <- genExpression (size - 2 - s1) o0 u1 vars
+    (s3, u3, e3) <- genExpression (size - 2 - s1 - s2) o0 u2 (vars + 2)
     return (2 + s1 + s2 + s3, u3, Fold vars (vars+1) e1 e2 e3)
 genExpression size ops unused vars =
   [(1, unused, Constant 0), (1, unused, Constant 1)]
@@ -354,9 +355,10 @@ genExpression size ops unused vars =
     folds = do
       guard $ Fold0 `elem` ops
       let u0 = unused \\ [Fold0]
-      (s1, u1, e1) <- genExpression (size - 2) ops u0 vars
-      (s2, u2, e2) <- genExpression (size - 2 - s1) ops u1 vars
-      (s3, u3, e3) <- genExpression (size - 2 - s1 - s2) ops u2 (vars + 2)
+          o0 = ops \\ [Fold0]
+      (s1, u1, e1) <- genExpression (size - 2) o0 u0 vars
+      (s2, u2, e2) <- genExpression (size - 2 - s1) o0 u1 vars
+      (s3, u3, e3) <- genExpression (size - 2 - s1 - s2) o0 u2 (vars + 2)
       return (2 + s1 + s2 + s3, u3, Fold vars (vars+1) e1 e2 e3)
     op1s = do
       opr <- filter isOp1 ops
