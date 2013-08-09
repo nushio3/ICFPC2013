@@ -1,7 +1,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 
+import System.Exit (ExitCode(..))
+import System.Process (readProcessWithExitCode)
+
 import Contents.Salt(encodeString)
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (threadDelay, forkIO)
 import Control.Lens ((%=), (.=), (.~), use, (&))
 import Control.Lens.TH (makeLenses)
 import Control.Monad
@@ -106,3 +109,24 @@ processCid cidStr = do
   openServer "report" retObj
   return True
 
+{-
+
+import System.Exit (ExitCode(..))
+import Control.Concurrent  
+import System.Process (readProcessWithExitCode)
+
+main :: IO ()
+main = do
+  (exitCode, hOut, hErr) <- readProcessWithExitCode "git" ["checkout", "181d7d3b5a27096beea5718cbf17b40f649e62c3"] ""
+  case exitCode of
+    ExitFailure _ -> do
+      putStrLn "owakon!"
+      print (exitCode, hOut, hErr)
+  
+    ExitSuccess -> do
+      putStrLn "kitapoyo"
+      print (exitCode, hOut, hErr)
+      (exitCode, hOut, hErr) <- readProcessWithExitCode "./init.sh" ["7" ,"2"] ""
+      print (exitCode, hOut, hErr)
+
+-}
