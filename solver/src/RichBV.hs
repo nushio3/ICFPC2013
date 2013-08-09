@@ -51,7 +51,7 @@ gen p = do
   genProgram (fromIntegral size) ops
 
 data Program = Program Expression
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Show, Ord, Read)
 
 data Expression =
     Constant Word64
@@ -60,10 +60,10 @@ data Expression =
   | Fold Int Int Expression Expression Expression
   | Op1 Op Expression
   | Op2 Op Expression Expression
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Show, Ord, Read)
 
 data Op = If0 | TFold | Fold0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Show, Ord, Read)
 
 canonic :: Program -> Program
 canonic (Program e) = Program $ canonical e
@@ -132,7 +132,7 @@ simplifyE (Op2 op e1 e2) = case (op, simplifyE e1, simplifyE e2) of
   (Plus, e1', Constant 0) -> e1'
   (Plus, e1', e2') | e1' == e2' -> simplifyE $ Op1 (Shl 1) e1'
 
-  (_, e1', e2') -> Op2 op e1' e2'
+  (_, e1', e2') -> Op2 op (min e1' e2') (max e1' e2')
 
 destructFold x y l v e = simplifyE e8
   where
