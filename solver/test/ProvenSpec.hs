@@ -14,6 +14,7 @@ import qualified BV as B
 import qualified RichBV as R
 import qualified SBV as B
 import qualified SRichBV as R
+import SBVTools
 import Convert
 import TestInputs
   
@@ -21,10 +22,23 @@ spec :: Spec
 spec = do
   describe "SBV === SRichBV" $ do
     forM_ programs $ \src -> do
-      prop ("SBV === SRichBV for " ++ src) $ \x -> 
+      it ("SBV === SRichBV for " ++ src) $ 
         let 
-          prog  = readProgram src 
-          prog' = enrichProgram $ readProgram src 
+          prog0 = B.sExec $ readProgram src 
+          prog1 = R.sExec $ enrichProgram $ readProgram src 
         in
-        x == (x :: Word64)
+        (Just True ==) $ unPredicate $ 
+          forAll ["input"] $
+            \x -> prog0 x .== prog1 x
+
+      it ("SRichBV === simplified SRichBV for " ++ src) $ 
+        let 
+          prog0 = enrichProgram $ readProgram src 
+          
+          prog1 = R.sExec $            prog0
+          prog2 = R.sExec $ R.simplify prog0
+        in
+        (Just True ==) $ unPredicate $ 
+          forAll ["input"] $
+            \x -> prog1 x .== prog2 x
 
