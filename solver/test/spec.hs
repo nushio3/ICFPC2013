@@ -9,6 +9,8 @@ import qualified SRichBVSpec
 import qualified ConvertSpec
 import qualified SimplifySpec
 
+import qualified ProvenSpec
+
 main :: IO ()
 main = do
   hspec $ do
@@ -16,5 +18,6 @@ main = do
     SimplifySpec.spec    
     SBVSpec.spec
     SRichBVSpec.spec    
+    ProvenSpec.spec        
 
 
