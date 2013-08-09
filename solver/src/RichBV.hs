@@ -21,7 +21,7 @@ import qualified Data.Map.Strict as M
 solve problem = do
   L.putStrLn $ encode problem
   let ps = gen problem
-      ss = S.toList $ S.fromList $ map (canonic.simplify.canonic) ps
+      ss = S.toList $ S.fromList $ map (canonic.simplify.moveIfP.simplify.canonic) ps
   putStrLn $ "generate " ++ show (length ps) ++ " candidates"
   putStrLn $ "simplify to " ++ show (length ss)
   -- mapM_ print ss
@@ -77,6 +77,21 @@ canonical (If p e1 e2) = If p (min e1 e2) (max e1 e2)
 canonical (Fold x y v e1 e2) = Fold x y v (min e1 e2) (max e1 e2)
 canonical (Op1 op e) = Op1 op e
 canonical (Op2 op e1 e2) = Op2 op (min e1 e2) (max e1 e2)
+
+moveIfP :: Program -> Program
+moveIfP (Program e) = Program $ moveIf e
+
+moveIf :: Expression -> Expression
+moveIf (Constant c) = Constant c
+moveIf (Var x) = Var x
+moveIf (If p t e) = If (moveIf p) (moveIf t) (moveIf e)
+moveIf (Op1 op e) = case moveIf e of
+  If p t e -> moveIf $ If p (Op1 op t) (Op1 op e)
+  e' -> Op1 op e'
+moveIf (Op2 op e1 e2) = case (moveIf e1, moveIf e2) of
+  (If p t e, e2') -> moveIf $ If p (Op2 op t e2') (Op2 op e e2')
+  (e1', If p t e) -> moveIf $ If p (Op2 op e1' t) (Op2 op e1' e)
+  (e1', e2') -> Op2 op e1 e2
 
 simplify :: Program -> Program
 simplify (Program e) = Program $ simplifyE e
@@ -136,21 +151,7 @@ simplifyE (Op2 op e1 e2) = case (op, simplifyE e1, simplifyE e2) of
 
   (_, e1', e2') -> Op2 op (min e1' e2') (max e1' e2')
 
-destructFold x y l v e = 
-  trace (printf "x={%s}" $ show x)$ 
-  trace (printf "y={%s}" $ show y)$ 
-  trace (printf "l={%s}" $ show l)$ 
-  trace (printf "v={%s}" $ show v)$ 
-  trace (printf "e={%s}" $ show e)$ 
-  trace (printf "l0={%s}" $ show l0)$ 
-  trace (printf "l1={%s}" $ show l1)$ 
-  trace (printf "l2={%s}" $ show l2)$   
-  trace (printf "l3={%s}" $ show l3)$   
-  trace (printf "e0={%s}" $ show e0)$ 
-  trace (printf "e1={%s}" $ show e1)$ 
-  trace (printf "e2={%s}" $ show e2)$   
-  trace (printf "e3={%s}" $ show e3)$ 
-  simplifyE e8    
+destructFold x y l v e = simplifyE e8    
   where
     l' = simplifyE l
     l0 = Op2 And l' (Constant 255)
