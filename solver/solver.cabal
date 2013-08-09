@@ -74,6 +74,7 @@ executable test-equiv
     , sbv == 2.10.*
 
 executable rich-main
+  Buildable: False
   Hs-Source-Dirs: exe-src
   Ghc-Options: -Wall -O2
   Main-Is: rich-main.hs
