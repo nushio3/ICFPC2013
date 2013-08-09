@@ -22,7 +22,7 @@ solve problem = do
       ss = S.toList $ S.fromList $ map (canonic.simplify.canonic) ps
   putStrLn $ "generate " ++ show (length ps) ++ " candidates"
   putStrLn $ "simplify to " ++ show (length ss)
-  mapM_ print ss
+  -- mapM_ print ss
 
 {-
   let go = do
@@ -38,9 +38,6 @@ solve problem = do
   -}
   putStrLn ""
 
-isUniq :: [[Word64]] -> Bool
-isUniq xs = S.size (S.fromList xs) == (length xs)
-
 gen p = do
   let size = p ^?! key "size"._Integer
       ops  = p ^.. key "operators"._Array.traverse._String.to toOp
@@ -53,7 +50,7 @@ data Expression =
     Constant Word64
   | Var Int
   | If Expression Expression Expression
-  | Fold Expression Expression Expression
+  | Fold Int Int Expression Expression Expression
   | Op1 Op Expression
   | Op2 Op Expression Expression
   deriving (Eq, Show, Ord)
@@ -68,7 +65,7 @@ canonical :: Expression -> Expression
 canonical (Constant c) = Constant c
 canonical (Var n) = Var n
 canonical (If p e1 e2) = If p (min e1 e2) (max e1 e2)
-canonical (Fold v e1 e2) = Fold v (min e1 e2) (max e1 e2)
+canonical (Fold x y v e1 e2) = Fold x y v (min e1 e2) (max e1 e2)
 canonical (Op1 op e) = Op1 op e
 canonical (Op2 op e1 e2) = Op2 op (min e1 e2) (max e1 e2)
 
@@ -83,8 +80,9 @@ simplifyE (If p e1 e2) = case simplifyE p of
   Constant _ -> simplifyE e2
   p' -> If p' (simplifyE e1) (simplifyE e2)
 
-simplifyE (Fold e1 e2 e3) =
-  Fold (simplifyE e1) (simplifyE e2) (simplifyE e3)
+simplifyE (Fold x y e1 e2 e3) =
+  -- Fold x y (simplifyE e1) (simplifyE e2) (simplifyE e3)
+  destructFold x y e1 e2 e3
 
 simplifyE (Op1 op e) = case (op, simplifyE e) of
   (_, Constant v) -> Constant $ evalOp1 op v
@@ -126,17 +124,49 @@ simplifyE (Op2 op e1 e2) = case (op, simplifyE e1, simplifyE e2) of
 
   (_, e1', e2') -> Op2 op e1' e2'
 
+destructFold x y l v e = simplifyE e8
+  where
+    l' = simplifyE l
+    l0 = Op2 And l' (Constant 255)
+    l1 = Op2 And (Op1 (Shr 8 ) l') (Constant 255)
+    l2 = Op2 And (Op1 (Shr 16) l') (Constant 255)
+    l3 = Op2 And (Op1 (Shr 24) l') (Constant 255)
+    l4 = Op2 And (Op1 (Shr 32) l') (Constant 255)
+    l5 = Op2 And (Op1 (Shr 40) l') (Constant 255)
+    l6 = Op2 And (Op1 (Shr 48) l') (Constant 255)
+    l7 = Op1 (Shr 56) l'
+    e0 = simplifyE v
+    e1 = subst x y l0 e0 e
+    e2 = subst x y l1 e1 e
+    e3 = subst x y l2 e2 e
+    e4 = subst x y l3 e3 e
+    e5 = subst x y l4 e4 e
+    e6 = subst x y l5 e5 e
+    e7 = subst x y l6 e6 e
+    e8 = subst x y l7 e7 e
+
+subst x y ex ey e = f e where
+  f (Constant c) = Constant c
+  f (Var i)
+    | i == x = ex
+    | i == y = ey
+    | otherwise = Var i
+  f (If x y z) = If (f x) (f y) (f z)
+  f (Fold i j x y z) = Fold i j (f x) (f y) (f z)
+  f (Op1 op e) = Op1 op (f e)
+  f (Op2 op e1 e2) = Op2 op (f e1) (f e2)
+
 eval :: Program -> Word64 -> Word64
 eval (Program e) x = evalE e [x]
 
 evalE :: Expression -> [Word64] -> Word64
 evalE (Constant c) _ = c
-evalE (Var ix) env = env !! (ix - 1)
+evalE (Var ix) env = env !! ix
 evalE (If e1 e2 e3) env =
   if evalE e1 env == 0
     then evalE e2 env
     else evalE e3 env
-evalE (Fold e1 e2 e3) env =
+evalE (Fold x y e1 e2 e3) env =
   let v = map (`mod` 0x100) $ take 8 $ iterate (`shiftR` 8) $ evalE e1 env
   in foldr (\w a -> evalE e3 $ env ++ [w, a]) (evalE e2 env) v
 evalE (Op1 op e) env =
@@ -179,6 +209,8 @@ isOp2 Xor  = True
 isOp2 Plus = True
 isOp2 _ = False
 
+-- generating all possible candidates
+
 genProgram :: Int -> [Op] -> [Program]
 genProgram size ops = do
   (s, [], e) <- genExpression (size - 1) ops ops 1
@@ -194,10 +226,10 @@ genExpression size ops unused vars
     (s1, u1, e1) <- genExpression (size - 2) ops u0 vars
     (s2, u2, e2) <- genExpression (size - 2 - s1) ops u1 vars
     (s3, u3, e3) <- genExpression (size - 2 - s1 - s2) ops u2 (vars + 2)
-    return (2 + s1 + s2 + s3, u3, Fold e1 e2 e3)
+    return (2 + s1 + s2 + s3, u3, Fold vars (vars+1) e1 e2 e3)
 genExpression size ops unused vars =
   [(1, unused, Constant 0), (1, unused, Constant 1)]
-  ++ [(1, unused, Var x) | x <- [1..vars]]
+  ++ [(1, unused, Var x) | x <- [0..vars-1]]
   ++ ifs ++ folds ++ op1s ++ op2s
   where
     ifs = do
@@ -213,7 +245,7 @@ genExpression size ops unused vars =
       (s1, u1, e1) <- genExpression (size - 2) ops u0 vars
       (s2, u2, e2) <- genExpression (size - 2 - s1) ops u1 vars
       (s3, u3, e3) <- genExpression (size - 2 - s1 - s2) ops u2 (vars + 2)
-      return (2 + s1 + s2 + s3, u3, Fold e1 e2 e3)
+      return (2 + s1 + s2 + s3, u3, Fold vars (vars+1) e1 e2 e3)
     op1s = do
       opr <- filter isOp1 ops
       let u0 = unused \\ [opr]
