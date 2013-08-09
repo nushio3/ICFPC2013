@@ -1,4 +1,4 @@
-module Examples where
+module TestInputs where
 
 import System.IO.Unsafe
 import System.Environment

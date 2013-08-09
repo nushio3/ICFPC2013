@@ -15,7 +15,7 @@ import Safe
 import BV
 import SBV
 import Convert
-import Examples
+import TestInputs
 
 import Debug.Trace(trace)
 import Text.Printf

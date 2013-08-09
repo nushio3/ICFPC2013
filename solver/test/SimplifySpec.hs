@@ -19,7 +19,7 @@ import qualified BV as B
 import qualified RichBV as R
 import SBV
 import Convert
-import Examples
+import TestInputs
   
 
 
