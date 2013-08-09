@@ -16,19 +16,7 @@ import qualified BV as B
 import qualified RichBV as R
 import SBV
 import Convert
-
-programs :: [String]
-programs = unsafePerformIO $ do
-  env <- lookupEnv "test_file"
-  case env of
-    Nothing -> return defs
-    Just fn -> do
-      xs <- readFile fn
-      return $ filter (not . null) $ lines xs
-  where
-    defs = [ "(lambda (x) x)"
-           , "(lambda (x) (fold x 0 (lambda (y z) (plus y z))))"
-           ]  
+import Examples
   
 spec :: Spec
 spec = do
