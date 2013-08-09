@@ -35,7 +35,15 @@ spec = do
   describe "equality of enrichment" $ do
     forM_ programs $ \src -> do
       prop ("BV.exec == RichBV.eval for " ++ src) $ \x -> 
-        let prog  = readProgram src 
-            prog' = enrichProgram $ readProgram src in
-        B.exec prog x == R.eval prog' x
+        let 
+          prog = unsafePerformIO $ do
+            let ret=readProgram src 
+            print ret
+            return ret
+          prog' = unsafePerformIO $ do
+            let ret = enrichProgram $ readProgram src 
+            print ret
+            return ret
+        in
+        B.exec prog x == R.eval prog' x 
 

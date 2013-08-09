@@ -27,7 +27,7 @@ convE m (B.If0 a b c) =
   R.If (convE m a) (convE m b) (convE m c)
 convE m (B.Fold a b (B.Reducer x y e)) =                        
   let m2 = m & at x ?~ n & at y ?~ (n+1) 
-      n = Map.size m2
+      n = Map.size m
   in
   R.Fold n (n+1)
     (convE m a) (convE m b) (convE m2 e)
