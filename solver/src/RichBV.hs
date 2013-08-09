@@ -16,6 +16,7 @@ import Data.Monoid
 import System.Random
 import qualified Data.Map.Strict as M
 import Data.Function
+import System.IO.Unsafe
 
 -- $setup
 -- >>> import Data.SBV
@@ -59,10 +60,27 @@ solve size ops equiv = do
         let n = 256
         vs <- replicateM n randomIO
         let xs = take n $ [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ vs
-        let res  = [ (map (eval p) xs, Endo (p:)) | p <- ss]
+        let res0  = [ (map (eval p) xs, Endo (p:)) | p <- ss]
+            mm0 :: M.Map [Word64] (Endo [Program])
+            mm0   = M.fromListWith mappend res0
+            freq0 = maximum $ map (length . retract) $ M.elems mm0
+            
+        let res1  = [ (map (eval p) xs, Endo (merger p)) | p <- ss] 
+            mm1 :: M.Map [Word64] (Endo [Program])
+            mm1   = M.fromListWith mappend res1
+            
+            merger :: Program -> [Program] -> [Program]
+            merger x xs 
+              | any (unsafePerformIO . equiv x) xs = xs
+              | otherwise        = x:xs
+        let
             mm :: M.Map [Word64] (Endo [Program])
-            mm   = M.fromListWith mappend res
+            mm   
+              | freq0 <= mismatchTolerance = mm0
+              | otherwise                  = mm1
             freq = maximum $ map (length . retract) $ M.elems mm
+              
+        
         if freq <= mismatchTolerance
           then do
             --let tt = map (retract . snd) $ reverse $ sortBy (compare `on` (length . retract . snd)) $ M.toList mm

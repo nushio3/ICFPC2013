@@ -8,6 +8,7 @@ import System.Random
 
 import RichBV
 import SRichBV
+import Convert
 
 getSomeOps :: Int -> IO [Op]
 getSomeOps size = do
@@ -30,10 +31,20 @@ main = do
       print (size, ops)
       let progs = genProgram size ops
       forM_ progs $ \prog -> do
+        print prog
+        
         flag <- prog `equiv` (simplify prog)
         when (not flag) $ do 
           print prog
           print $ simplify prog
           exitFailure
+        
+        let prog2 = enrichProgram $ readProgram $ printProgram prog
+        flag <- prog `equiv` prog2
+        when (not flag) $ do 
+          print prog
+          print $ simplify prog
+          exitFailure
+        
     
   
