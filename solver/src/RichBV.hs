@@ -43,6 +43,9 @@ retract (Endo f) = f []
 optimize :: Program -> Program
 optimize = canonic.simplify.moveOp2P.moveIfP.simplify.moveOp2P.moveIfP.simplify.canonic -- .destructFold
 
+overlapMap :: Ord k => [(k, v)] -> M.Map k [v]
+overlapMap = M.map retract . M.fromListWith mappend . fmap (fmap (Endo . (:)))
+
 solve :: Int -> [String] -> (Program -> Program -> IO Bool) -> IO (Maybe (Context [Word64] [Word64] String))
 solve size ops equiv = do
   let ps = genProgram (fromIntegral size) $ map toOp ops
@@ -59,18 +62,17 @@ solve size ops equiv = do
         n <- randomRIO (1, 100)
         vs <- replicateM n randomIO
         let xs = [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ vs
-        let res  = [ (map (eval p) xs, Endo (p:)) | p <- ss]
-            mm   = M.fromListWith mappend res
-            freq = maximum $ map (length . retract) $ M.elems mm
+        let mm   = overlapMap [ (map (eval p) xs, p) | p <- ss]
+            freq = maximum $ map length $ M.elems mm
         if freq <= mismatchTolerance
           then do
             --let tt = map (retract . snd) $ reverse $ sortBy (compare `on` (length . retract . snd)) $ M.toList mm
             --mapM_ (print . map printProgram) tt
-            return $ Just $ Context (\vss -> printProgram $ ms M.! head (retract $ mm M.! vss)) xs
+            return $ Just $ Context (\vss -> printProgram $ ms M.! head (mm M.! vss)) xs
           else do
             if i > retryTimes
               then do
-                let tt = retract $ snd $ head $ reverse $ sortBy (compare `on` (length . retract . snd)) $ M.toList mm
+                let tt = snd $ head $ reverse $ sortBy (compare `on` (length . snd)) $ M.toList mm
                 putStrLn $ "Group size: " ++ show (length tt)
                 forM_ (zip [1..] tt) $ \(i, x) -> forM_ (zip [1..] tt) $ \(j, y) -> do
                   when (i < j) $ do
