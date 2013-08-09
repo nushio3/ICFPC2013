@@ -32,7 +32,7 @@ main = do
 solve problem = do
   L.putStrLn $ encode problem
   let ps = gen problem
-      ss = S.toList $ S.fromList $ map simplify ps
+      ss = S.toList $ S.fromList $ map (canonic.simplify.canonic) ps
   putStrLn $ "generate " ++ show (length ps) ++ " candidates"
   putStrLn $ "simplify to " ++ show (length ss)
   mapM_ print ss
@@ -73,6 +73,17 @@ data Expression =
 
 data Op = If0 | TFold | Fold0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus
   deriving (Eq, Show, Ord)
+
+canonic :: Program -> Program
+canonic (Program e) = Program $ canonical e
+
+canonical :: Expression -> Expression
+canonical (Constant c) = Constant c
+canonical (Var n) = Var n
+canonical (If p e1 e2) = If p (min e1 e2) (max e1 e2)
+canonical (Fold v e1 e2) = Fold v (min e1 e2) (max e1 e2)
+canonical (Op1 op e) = Op1 op e
+canonical (Op2 op e1 e2) = Op2 op (min e1 e2) (max e1 e2)
 
 simplify :: Program -> Program
 simplify (Program e) = Program $ simplifyE e
