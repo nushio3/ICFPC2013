@@ -11,7 +11,6 @@ import System.Environment
 import SRichBV (equiv)
 import API
 
-
 solveAndAnswer :: Given Token => T.Text -> Int -> [T.Text] -> IO (String, GuessResponse)
 solveAndAnswer tid size ops = do
     Just (Context restore query) <- solve size $ map T.unpack ops
