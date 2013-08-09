@@ -33,6 +33,7 @@ sEvalOp2 Or   = (.|.)
 sEvalOp2 Xor  = xor
 sEvalOp2 Plus = (+)
 
+
 equiv ::  Program -> Program -> IO Bool
 equiv prog1 prog2 = do
   resp <- prove $ \x -> sExec prog1 x .== sExec prog2 x
