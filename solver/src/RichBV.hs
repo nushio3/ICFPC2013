@@ -14,7 +14,7 @@ import Data.Word
 import Data.Bits
 import System.Random
 import qualified Data.Set as S
-
+import qualified Data.Map.Strict as M
 
 solve problem = do
   L.putStrLn $ encode problem
@@ -24,18 +24,25 @@ solve problem = do
   putStrLn $ "simplify to " ++ show (length ss)
   -- mapM_ print ss
 
-{-
-  let go = do
-        n <- randomRIO (1, 256) 
-        xs <- replicateM n randomIO
-        let res = [ map (eval p) xs | p <- ps]
-        if isUniq res
+  let go i = do
+        n <- randomRIO (1, 100) 
+        vs <- replicateM n randomIO
+        let xs = [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ vs
+        let res  = [ map (eval p) xs | p <- ss]
+            mm   = M.fromListWith (+) $ map (\x -> (x, 1)) res
+            freq = maximum $ map snd $ M.toList mm
+        if freq <= 60
           then return xs
-          else go
+          else do
+            if i > 1000 then mapM_ print ss >> return [] else go (i + 1)
+--            when (i > 1000) $ do
+--              print $ zip xs $ snd $ maximum $ map (\(a,b)->(b,a)) $ M.toList mm
+--              error "hoge"
+--            go $ i + 1
 
-  ans <- go
+  ans <- go 0
   print ans
-  -}
+
   putStrLn ""
 
 gen p = do
@@ -75,10 +82,12 @@ simplify (Program e) = Program $ simplifyE e
 simplifyE :: Expression -> Expression
 simplifyE (Constant c) = Constant c
 simplifyE (Var i) = Var i
-simplifyE (If p e1 e2) = case simplifyE p of
-  Constant 0 -> simplifyE e1
-  Constant _ -> simplifyE e2
-  p' -> If p' (simplifyE e1) (simplifyE e2)
+simplifyE (If p e1 e2) = case (simplifyE p, simplifyE e1, simplifyE e2) of
+  (Constant 0, e1', _) -> e1'
+  (Constant _, _, e2') -> e2'
+  (_, e1', e2') | canonical e1' == canonical e2' -> e1'
+
+  (p', e1', e2') -> If p' e1' e2'
 
 simplifyE (Fold x y e1 e2 e3) =
   -- Fold x y (simplifyE e1) (simplifyE e2) (simplifyE e3)
@@ -94,6 +103,7 @@ simplifyE (Op1 op e) = case (op, simplifyE e) of
 
   (Shr n, Op1 (Shr m) e') -> simplifyE $ Op1 (Shr $ n + m) e'
   (Shr n, _) | n >= 64 -> Constant 0
+  (Shr n, e') | lessThan (2^n) e' -> Constant 0
 
   (_, e') -> Op1 op e'
 
@@ -155,6 +165,17 @@ subst x y ex ey e = f e where
   f (Fold i j x y z) = Fold i j (f x) (f y) (f z)
   f (Op1 op e) = Op1 op (f e)
   f (Op2 op e1 e2) = Op2 op (f e1) (f e2)
+
+lessThan ub e = case simplifyE e of
+  Constant c | c < ub -> True
+  If _ e1 e2 | lessThan ub e1 && lessThan ub e2 -> True
+  Op1 (Shl n) e1 | lessThan (ub `shiftR` n) e1 -> True
+  Op1 (Shr n) e1 | lessThan (ub `shiftL` n) e1 -> True
+  Op2 And e1 e2 | lessThan ub e1 || lessThan ub e2 -> True
+  Op2 Or  e1 e2 | lessThan (ub `div` 2) e1 && lessThan (ub `div` 2) e2 -> True
+  Op2 Xor e1 e2 | lessThan (ub `div` 2) e1 && lessThan (ub `div` 2) e2 -> True
+  Op2 Plus e1 e2 | lessThan (ub `div` 2) e1 && lessThan (ub `div` 2) e2 -> True
+  _ -> False
 
 eval :: Program -> Word64 -> Word64
 eval (Program e) x = evalE e [x]
