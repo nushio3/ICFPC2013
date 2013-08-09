@@ -1,5 +1,8 @@
 ICFPC2013
 =========
+See the wiki pages.
+
+https://github.com/nushio3/ICFPC2013/wiki/_pages
 
 Repository for ICFP Programming Contest 2013. See the following website for the progress.
 
