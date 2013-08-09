@@ -47,6 +47,7 @@ solve :: Int -> [String] -> (Program -> Program -> IO Bool) -> IO (Maybe (Contex
 solve size ops equiv = do
   let ps = genProgram (fromIntegral size) $ map toOp ops
       qs = map optimize ps
+      ms :: M.Map Program Program
       ms = M.fromList $ zip qs ps
       ss = M.keys ms
   putStrLn $ "Size: " ++ show size ++ ", " ++ show ops
