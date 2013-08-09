@@ -1,0 +1,12 @@
+<table><tr><th>id</th><th>size</th><th>operators</th></tr>
+{% for p in problems %}
+<tr>
+  <td>{{ p.id }}</td>
+  <td>{{ p.size }}</td>
+  <td>{% for op in p.operators %}
+      {{ op }},
+      {% endfor %}
+  </td>
+</tr>
+{% endfor %}
+</table>
