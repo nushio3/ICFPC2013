@@ -15,13 +15,10 @@ import qualified ProvenSpec
 main :: IO ()
 main = do
   hspec $ do
-    SBVSpec.spec
-    {-
     EvalSpec.spec
     ConvertSpec.spec
     SimplifySpec.spec    
+    SBVSpec.spec
     SRichBVSpec.spec    
     ProvenSpec.spec        
 
-
--}
