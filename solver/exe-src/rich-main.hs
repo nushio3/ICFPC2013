@@ -10,6 +10,8 @@ import Data.Function
 import Control.Monad
 import Control.Applicative
 import Data.Reflection
+import qualified Data.Text as T
+import Text.Printf
 
 import SRichBV (equiv)
 import API
@@ -24,9 +26,14 @@ main = do
 
 main = do
   give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ do
-    TrainingProblem _ tid tsize tpos <- train $ TrainRequest 5 ["if0", "plus", "and", "shr1"]
-    ans <- solve tsize tpos
-    print ans
+    TrainingProblem _prog tid tsize tops <- train $ TrainRequest 5 []
+    print (_prog, tid, tsize, tops)
+    Just (query, lu) <- solve tsize $ map T.unpack tops
+    EvalResponse estat (Just eout) emsg <- API.eval $ EvalRequest (Just tid) Nothing $ map (T.pack . printf "0x%016X") query
+    print (estat, eout, emsg)
+    putStrLn $ "my guessed answer: " ++ lu eout
+    resp <- guess $ Guess tid $ T.pack (lu eout)
+    print resp
 
 --main = do
 --  ps <- programs

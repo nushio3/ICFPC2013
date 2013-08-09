@@ -14,6 +14,8 @@ import qualified Data.Aeson as JSON
 import Data.Vector.Lens
 import Data.Text (Text)
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Text as T
+import Data.Word
 
 newtype Token = Token { unToken :: String }
 
@@ -23,7 +25,7 @@ endpoint path = "http://icfpc2013.cloudapp.net/" ++ path ++ "?auth=" ++ unToken 
 post :: Given Token => String -> Value -> IO Value
 post p body = withSocketsDo $ withManager $ \man -> do
     req <- parseUrl (endpoint p)
-    httpLbs req { method = "GET", requestBody = RequestBodyLBS (JSON.encode body) } man
+    httpLbs req { method = "POST", requestBody = RequestBodyLBS (JSON.encode body) } man
         >>= maybe (fail "JSON decoding error") return . JSON.decode .responseBody
 
 myproblems :: Given Token => IO [Problem]
@@ -43,7 +45,10 @@ eval (EvalRequest i p as) = do
         & _Object . at "id" .~ fmap (_String #) i
         & _Object . at "program" .~ fmap (_String #) p
         & _Object . at "arguments" ?~ map (_String #) as ^. vector . re _Array)
-    return $ EvalResponse (res ^?! ix "status" . _String . to toEvalStatus) (res ^? ix "outputs" >>= preview textList) (res ^? ix "message" . _String)
+    return $ EvalResponse
+      (res ^?! ix "status" . _String . to toEvalStatus)
+      (map (read . T.unpack) <$> (res ^? ix "outputs" >>= preview textList))
+      (res ^? ix "message" . _String)
 
 toEvalStatus :: Text -> EvalStatus
 toEvalStatus "ok" = EvalOk
@@ -58,7 +63,7 @@ guess (Guess i p) = do
 
 train :: Given Token => TrainRequest -> IO TrainingProblem
 train (TrainRequest size ops) = do
-    res <- post "guess" (JSON.emptyObject
+    res <- post "train" (JSON.emptyObject
         & _Object . at "size" ?~ _Integer # toEnum size
         & _Object . at "operators" ?~ _Array . from vector # map (_String #) ops)
     return $ TrainingProblem (res ^?! ix "challenge" . _String)
@@ -81,7 +86,7 @@ data Problem = Problem
     , timeLeft :: Maybe Int
     }
 
-data EvalStatus = EvalOk | EvalError
+data EvalStatus = EvalOk | EvalError deriving (Show)
 
 data EvalRequest = EvalRequest
     { evalId :: Maybe Text
@@ -90,20 +95,20 @@ data EvalRequest = EvalRequest
     }
 data EvalResponse = EvalResponse
     { evalStatus :: EvalStatus
-    , evalOutputs :: Maybe [Text]
+    , evalOutputs :: Maybe [Word64]
     , _evalMessage :: Maybe Text
-    }
+    } deriving (Show)
 data Guess = Guess
     { guessId :: Text
     , guessProgram :: Text
     }
 
-data GuessStatus = GuessWin | GuessMismatch | GuessError
+data GuessStatus = GuessWin | GuessMismatch | GuessError deriving (Show)
 data GuessResponse = GuessResponse
     { guessStatus :: GuessStatus
     , guessValues :: Maybe [Text]
     , guessMessage :: Maybe Text
-    }
+    } deriving (Show)
 data TrainRequest = TrainRequest
     { trainSize :: Int
     , trainOperators :: [Text]

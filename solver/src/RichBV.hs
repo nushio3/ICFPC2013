@@ -19,16 +19,18 @@ import Text.Printf
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 
-solve' :: Value  -> IO (Maybe [Word64])
+solve' :: Value  -> IO (Maybe ([Word64], [Word64] -> String))
 solve' p = do
   let size = p ^?! key "size"._Integer.from enum
       ops  = p ^.. key "operators"._Array.traverse._String.unpacked
   solve size ops
 
-solve :: Int -> [String] -> IO (Maybe [Word64])
+solve :: Int -> [String] -> IO (Maybe ([Word64], [Word64] -> String))
 solve size ops = do
   let ps = gen size ops 
-      ss = S.toList $ S.fromList $ map (canonic.simplify.moveOp2P.moveIfP.simplify.canonic) ps
+      qs = map (canonic.simplify.moveOp2P.moveIfP.simplify.canonic) ps
+      ms = M.fromList $ zip qs ps
+      ss = M.keys ms
   putStrLn $ "generate " ++ show (length ps) ++ " candidates"
   putStrLn $ "simplify to " ++ show (length ss)
   -- mapM_ print ss
@@ -37,11 +39,11 @@ solve size ops = do
         n <- randomRIO (1, 100) 
         vs <- replicateM n randomIO
         let xs = [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ vs
-        let res  = [ map (eval p) xs | p <- ss]
-            mm   = M.fromListWith (+) $ map (\x -> (x, 1)) res
-            freq = maximum $ map snd $ M.toList mm
+        let res  = [ (map (eval p) xs, [p]) | p <- ss]
+            mm   = M.fromListWith (++) res
+            freq = maximum $ map (length . snd) $ M.toList mm
         if freq <= 60
-          then return $ Just xs
+          then return $ Just (xs, \vs -> printProgram $ ms M.! (head $ mm M.! vs))
           else do
             if i > 1000
               then do
@@ -54,10 +56,7 @@ solve size ops = do
 --              error "hoge"
 --            go $ i + 1
 
-  ans <- go 0
-  print ans
-
-  return ans
+  go 0 :: IO (Maybe ([Word64], [Word64] -> String))
 
 gen size ops = do
   genProgram (fromIntegral size) $ map toOp ops
@@ -76,6 +75,26 @@ data Expression =
 
 data Op = If0 | TFold | Fold0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus
   deriving (Eq, Show, Ord, Read)
+
+printProgram (Program e) = "(lambda (x0) " ++ f e ++ ")" where
+  f (Constant n) | n == 0 || n == 1 = show n
+  f (Var ix) = "x" ++ show ix
+  f (If c t e) = "(if0 " ++ f c ++ " " ++ f t ++ " " ++ f e ++ ")"
+  f (Fold i j l v e) = "(fold " ++ f l ++ " " ++ f v ++ " (lambda (x" ++ show i ++ " x" ++ show j ++ ") " ++ f e ++ ")"
+  f (Op1 op e) = "(" ++ g op ++ " " ++ f e ++ ")"
+  f (Op2 op e1 e2) = "(" ++ g op ++ " " ++ f e1 ++ " " ++ f e2 ++ ")"
+
+  g If0 = "if0"
+  g Fold0 = "fold"
+  g Not = "not"
+  g (Shl 1) = "shl1"
+  g (Shr 1) = "shr1"
+  g (Shr 4) = "shr4"
+  g (Shr 16) = "shr16"
+  g And = "and"
+  g Or = "or"
+  g Xor = "xor"
+  g Plus = "plus"
 
 canonic :: Program -> Program
 canonic (Program e) = Program $ canonical e
