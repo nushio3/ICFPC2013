@@ -297,7 +297,7 @@ lessThan ub e = case simplifyE e of
 
 isZero, isNotZero :: Expression  -> Bool
 isZero e = all (\i -> testB e i == Just False) [0..63]
-isNotZero e = any (\i -> testB e i /= Just False) [0..63]
+isNotZero e = any (\i -> testB e i == Just True) [0..63]
 
 testB :: Expression -> Int -> Maybe Bool
 testB (Constant c) i = Just $ c `testBit` i

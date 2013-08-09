@@ -25,7 +25,7 @@ endpoint path = "http://icfpc2013.cloudapp.net/" ++ path ++ "?auth=" ++ unToken 
 post :: Given Token => String -> Value -> IO Value
 post p body = withSocketsDo $ withManager $ \man -> do
     req <- parseUrl (endpoint p)
-    httpLbs req { method = "POST", requestBody = RequestBodyLBS (JSON.encode body) } man
+    httpLbs req { method = "POST", requestBody = RequestBodyLBS (JSON.encode body), responseTimeout = Just (30*10^6) } man
         >>= maybe (fail "JSON decoding error") return . JSON.decode .responseBody
 
 myproblems :: Given Token => IO [Problem]
