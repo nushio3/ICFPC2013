@@ -61,6 +61,22 @@ Test-Suite spec
     , QuickCheck >= 2.5
     , sbv == 2.10.*
 
+-- Test-Suite doctests
+--   Type: exitcode-stdio-1.0
+--   HS-Source-Dirs: test
+--   Ghc-Options: -Wall -threaded 
+--   Main-Is: doctests.hs
+-- 
+--   
+-- 
+--   Build-Depends:
+--       base
+--     , directory >= 1.1
+--     , filepath >= 1.2
+--     , MissingH >= 1.1
+--     , doctest >= 0.9.3
+
+
 executable test-equiv
   Hs-Source-Dirs: exe-src
   Ghc-Options: -Wall -O2

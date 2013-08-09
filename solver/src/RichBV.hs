@@ -19,6 +19,10 @@ import Text.Printf
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 
+-- $setup
+-- >>> import Data.SBV
+
+
 solve' :: Value  -> IO (Maybe ([Word64], [Word64] -> String))
 solve' p = do
   let size = p ^?! key "size"._Integer.from enum
