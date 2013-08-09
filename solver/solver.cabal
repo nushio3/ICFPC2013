@@ -17,14 +17,19 @@ cabal-version:       >=1.8
 library
   exposed-modules:   
     BV
+    RichBV
     SBV
     Util
   hs-source-dirs:    src/  
   -- other-modules:       
   build-depends:      
       base ==4.*
+    , aeson
+    , bytestring
     , containers == 0.5.*
     , lens ==3.9.*
+    , lens-aeson
+    , random
     , sbv == 2.10.*
     , trifecta ==1.1.*
   Ghc-Options: -Wall -O2
@@ -53,6 +58,23 @@ executable test-equiv
                     
   Build-Depends: 
       base ==4.*
+    , solver
+    , safe
+    , sbv == 2.10.*
+
+executable rich-main
+  Hs-Source-Dirs: exe-src
+  Ghc-Options: -Wall -O2
+  Main-Is: rich-main.hs
+  Other-Modules: 
+                    
+  Build-Depends: 
+      base ==4.*
+    , aeson
+    , bytestring
+    , lens
+    , lens-aeson
+    , random
     , solver
     , safe
     , sbv == 2.10.*
