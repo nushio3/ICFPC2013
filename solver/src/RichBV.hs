@@ -204,7 +204,7 @@ evalE (If e1 e2 e3) env =
     then evalE e2 env
     else evalE e3 env
 evalE (Fold x y e1 e2 e3) env =
-  let v = map (`mod` 0x100) $ take 8 $ iterate (`shiftR` 8) $ evalE e1 env
+  let v = map (`mod` 0x100) $ reverse $ take 8 $ iterate (`shiftR` 8) $ evalE e1 env
   in foldr (\w a -> evalE e3 $ env ++ [w, a]) (evalE e2 env) v
 evalE (Op1 op e) env =
   evalOp1 op $ evalE e env

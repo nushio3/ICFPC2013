@@ -42,15 +42,15 @@ spec = do
           prog0 = readProgram src 
           prog = unsafePerformIO $ do
             let ret=enrichProgram $ readProgram src 
-            print ret
+            --print ret
             return ret
           prog' = unsafePerformIO $ do
             let ret = R.simplify $  prog
-            print ret
+            --print ret
             return ret
         in
-        trace (printf "prog0 %d = %d" x (B.exec prog0 x)) $          
-        trace (printf "prog %d = %d" x (R.eval prog x)) $ 
-        trace (printf "prog' %d = %d" x (R.eval prog' x)) $ 
+--         trace (printf "prog0 %d = %d" x (B.exec prog0 x)) $          
+--         trace (printf "prog %d = %d" x (R.eval prog x)) $ 
+--         trace (printf "prog' %d = %d" x (R.eval prog' x)) $ 
         R.eval prog x == R.eval prog' x 
 

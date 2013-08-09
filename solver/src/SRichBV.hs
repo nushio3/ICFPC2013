@@ -16,7 +16,7 @@ sEvalE (If e1 e2 e3) env =
       (sEvalE e2 env)
       (sEvalE e3 env)
 sEvalE (Fold _ _  e1 e2 e3) env =
-  let v = map (.&. 0xFF) $ take 8 $ iterate (`shiftR` 8) $ sEvalE e1 env
+  let v = map (.&. 0xFF) $ reverse $ take 8 $ iterate (`shiftR` 8) $ sEvalE e1 env
   in foldr (\w a -> sEvalE e3 $ env ++ [w, a]) (sEvalE e2 env) v
   
 sEvalE (Op1 op e) env =

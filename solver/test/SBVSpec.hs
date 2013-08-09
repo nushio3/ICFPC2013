@@ -16,6 +16,9 @@ import BV
 import SBV
 import Convert
 
+import Debug.Trace(trace)
+import Text.Printf
+
 unsafeSExec ::  Program -> BitVector -> Maybe BitVector
 unsafeSExec prog i = unsafePerformIO $ do
   let rvSymbol = "returnValue"
@@ -48,9 +51,11 @@ programs = unsafePerformIO $ do
   
 spec :: Spec
 spec = do
-  describe "sbv converter" $ do
+  describe "sbv spec" $ do
     forM_ programs $ \src -> do
       prop ("exec == sExec for " ++ src) $ \x -> 
         let prog = readProgram src in
+        trace (printf "prog %d = %d" x (exec prog x)) $
+        trace (printf "prog %d = %s" x (show $ unsafeSExec prog x)) $
         Just (exec prog x) == unsafeSExec prog x
 

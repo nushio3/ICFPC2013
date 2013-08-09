@@ -79,7 +79,7 @@ exec (Program x e) i = eval (Map.singleton x i) e
 eval :: Map.Map Idfr BitVector -> Expr -> BitVector
 eval m (If0 a b c) = if eval m a == 0 then eval m b else eval m c
 eval m (Fold a b (Reducer v w e)) = foldr (\x y -> eval (m & at v ?~ x & at w ?~ y) e) (eval m b)
-    $ [shiftR (eval m a) (i * 8) .&. 0xFF | i <- [0..7]]
+    $ [shiftR (eval m a) (i * 8) .&. 0xFF | i <- [7,6..0]]
 eval m (Op1 Not e) = complement (eval m e)
 eval m (Op1 Shl1 e) = shiftL (eval m e) 1
 eval m (Op1 Shr1 e) = shiftR (eval m e) 1

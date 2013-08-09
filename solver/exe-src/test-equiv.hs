@@ -3,13 +3,19 @@ module Main where
 import Data.SBV
 import SRichBV (equiv)
 import Convert (readProgram, enrichProgram)
+import qualified BV as B
 
 main :: IO ()
 main = do
+  print $ B.exec prog10 1
+  
+  
   prog1 `equiv` prog2 >>= print
   where
     rp = enrichProgram . readProgram
     
+    prog10 = readProgram "(lambda (x) (fold x 0 (lambda (y z) (plus y z) )))"
+
     prog1 = rp "(lambda (x) (if0 1          0 1))"
     prog2 = rp "(lambda (x) (if0 (plus x x) 0 1))"            
 

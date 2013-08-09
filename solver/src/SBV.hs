@@ -12,13 +12,6 @@ sExec :: Program -> (SBitVector -> Symbolic SBitVector)
 sExec (Program x e) i = 
   sEval (Map.singleton x i) e
   
-
-
-
-
-
-
-  
 sEval :: Map.Map Idfr SBitVector -> Expr -> Symbolic SBitVector
 sEval m (If0 a b c) = do
   va <- sEval m a
@@ -27,7 +20,7 @@ sEval m (If0 a b c) = do
   return $ ite (va .== 0) vb vc
 sEval m (Fold a b (Reducer v w e)) = do
   va <- sEval m a
-  foldr go (sEval m b) [shiftR va (i * 8) .&. 0xFF | i <- [0..7]]
+  foldr go (sEval m b) [shiftR va (i * 8) .&. 0xFF | i <- [7,6..0]]
   where 
     go x my = do
       y <- my
