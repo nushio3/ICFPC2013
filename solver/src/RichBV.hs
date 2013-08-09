@@ -108,7 +108,7 @@ printProgram (Program e) = "(lambda (x0) " ++ f e ++ ")" where
   f (Constant n) = show n
   f (Var ixx) = "x" ++ show ixx
   f (If c t ee) = "(if0 " ++ f c ++ " " ++ f t ++ " " ++ f ee ++ ")"
-  f (Fold i j l v ee) = "(fold " ++ f l ++ " " ++ f v ++ " (lambda (x" ++ show i ++ " x" ++ show j ++ ") " ++ f ee ++ ")"
+  f (Fold i j l v ee) = "(fold " ++ f l ++ " " ++ f v ++ " (lambda (x" ++ show i ++ " x" ++ show j ++ ") " ++ f ee ++ "))"
   f (Op1 opr ee) = "(" ++ g opr ++ " " ++ f ee ++ ")"
   f (Op2 opr e1 e2) = "(" ++ g opr ++ " " ++ f e1 ++ " " ++ f e2 ++ ")"
 
