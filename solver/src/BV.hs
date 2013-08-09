@@ -4,6 +4,7 @@ import Text.Trifecta
 import Control.Applicative
 import Control.Lens
 import Data.Word
+import Data.Bits
 import qualified Data.Map as M
 
 identifier = token $ some lower
@@ -71,21 +72,19 @@ programSize (Program _ e) = 1 + exprSize e
 
 type BitVector = Word64
 
-exec :: Program -> Word64 -> Word64
-exec 
-
-eval :: Map.Map Expr -> Word64
-eval m (If0 a b c) = if eval a == 0 then a else b
-eval m (Fold a b (Reducer x y e)) = [shiftR a i | i <- [0..7]]
+eval :: M.Map Idfr BitVector -> Expr -> BitVector
+eval m (If0 a b c) = if eval m a == 0 then eval m b else eval m c
+eval m (Fold a b (Reducer v w e)) = foldr (\x y -> eval (m & ix v .~ x & ix w .~ y) e) (eval m b)
+    $ [shiftR (eval m a) (i * 8) .&. 0xFF | i <- [0..7]]
 eval m (Op1 Not e) = complement (eval m e)
-eval m (Op1 Shl1 e) = shiftL 1 (eval m e)
-eval m (Op1 Shr1 e) = shiftR 1 (eval m e)
-eval m (Op1 Shr4 e) = shiftR 4 (eval m e)
-eval m (Op1 Shr16 e) = shiftR 16 (eval m e)
+eval m (Op1 Shl1 e) = shiftL (eval m e) 1
+eval m (Op1 Shr1 e) = shiftR (eval m e) 1
+eval m (Op1 Shr4 e) = shiftR (eval m e) 4
+eval m (Op1 Shr16 e) = shiftR (eval m e) 16
 eval m (Op2 Plus a b) = eval m a + eval m b
 eval m (Op2 And a b) = eval m a .&. eval m b
 eval m (Op2 Or a b) = eval m a .|. eval m b
 eval m (Op2 Xor a b) = eval m a `xor` eval m b
-eval m (Var v) = m Map.! v
-eval C0 = 0
-eval C1 = 1
+eval m (Var v) = m M.! v
+eval _ C0 = 0
+eval _ C1 = 1
