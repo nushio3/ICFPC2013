@@ -1,6 +1,8 @@
 import Text.Trifecta
 import Control.Applicative
 import Control.Lens
+import Data.Word
+import qualfoData.Map as M
 
 identifier = token $ some lower
 
@@ -64,3 +66,24 @@ exprSize C1 = 1
 
 programSize :: Program -> Int
 programSize (Program _ e) = 1 + exprSize e
+
+type BitVector = Word64
+
+exec :: Program -> Word64 -> Word64
+exec 
+
+eval :: Map.Map Expr -> Word64
+eval m (If0 a b c) = if eval a == 0 then a else b
+eval m (Fold a b (Reducer x y e)) = [shiftR a i | i <- [0..7]]
+eval m (Op1 Not e) = complement (eval m e)
+eval m (Op1 Shl1 e) = shiftL 1 (eval m e)
+eval m (Op1 Shr1 e) = shiftR 1 (eval m e)
+eval m (Op1 Shr4 e) = shiftR 4 (eval m e)
+eval m (Op1 Shr16 e) = shiftR 16 (eval m e)
+eval m (Op2 Plus a b) = eval m a + eval m b
+eval m (Op2 And a b) = eval m a .&. eval m b
+eval m (Op2 Or a b) = eval m a .|. eval m b
+eval m (Op2 Xor a b) = eval m a `xor` eval m b
+eval m (Var v) = m Map.! v
+eval C0 = 0
+eval C1 = 1
