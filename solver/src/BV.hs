@@ -7,7 +7,7 @@ import Data.Word
 import Data.Bits
 import qualified Data.Map as Map
 
-identifier = token $ some (lower <|> char '_')
+identifier = token $ (:) <$> lower <*> many (lower <|> digit <|> char '_')
 
 type Idfr = String
 
