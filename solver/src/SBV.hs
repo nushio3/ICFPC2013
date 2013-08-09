@@ -2,7 +2,7 @@ module SBV where
 
 import BV
 import Control.Applicative
-import Control.Lens ((&), (.~), ix)
+import Control.Lens ((&), (?~), at)
 import qualified Data.Map as Map
 import Data.SBV
 
@@ -24,7 +24,7 @@ sEval m (Fold a b (Reducer v w e)) = do
   where 
     go x my = do
       y <- my
-      sEval (m & ix v .~ x & ix w .~ y) e
+      sEval (m & at v ?~ x & at w ?~ y) e
   
 sEval m (Op1 Not e) = sOp1 complement m e
 sEval m (Op1 Shl1 e) = sOp1 (flip shiftL 1) m e

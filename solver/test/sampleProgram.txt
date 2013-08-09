@@ -1,2 +1,9 @@
 (lambda (x_10381) (if0 (or (and (shr1 x_10381) 1) 0) x_10381 1))
 (lambda (x) (fold x 0 (lambda (y z) (plus y z ))))
+(lambda (x_42665) (fold (not (if0 (plus (shr16 (not (shr16 0))) x_42665) x_42665 x_42665)) x_42665 (lambda (x_42666 x_42667) (not (xor x_42667 x_42666)))))
+(lambda (x_7591) (xor (plus (shr4 (shr1 x_7591)) 1) 1))
+(lambda (x_41589) (or 1 (shl1 (xor (not (plus (xor (plus x_41589 (shr1 (if0 (shr16 (and (xor (shr4 (shr4 (xor x_41589 1))) 1) x_41589)) 0 1))) 1) 0)) 1))))
+(lambda (x_41181) (or (not (or (plus (not (plus x_41181 (shr16 (shr1 (shl1 (xor (or (if0 (and (and (not 0) 0) x_41181) 0 x_41181) x_41181) 0)))))) 1) 0)) x_41181))
+(lambda (x_7431) (fold x_7431 0 (lambda (x_7431 x_7432) (xor (and x_7431 1) 0))))
+(lambda (x_42338) (shr4 (xor (shl1 (or (or (xor (if0 x_42338 (shr1 (shr1 (or (if0 (and (or (shr16 x_42338) x_42338) 0) x_42338 x_42338) x_42338))) 0) x_42338) x_42338) 1)) x_42338)))
+

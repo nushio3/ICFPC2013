@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module SBVSpec (spec) where
 
+import Control.Monad
 import Data.List (isInfixOf, isPrefixOf)
 import Data.Maybe
 import Data.Monoid (mempty)
@@ -32,21 +33,23 @@ unsafeSExec prog i = unsafePerformIO $ do
         maybeToList $ readMay val
   return $ headMay rcand
 
-prog1 :: Program
-prog1 = Program "x" $ Var "x"
-
-prog2 :: Program
-prog2 = 
-  case parseString parseProgram mempty
-       "(lambda (x) (fold x 0 (lambda (y z) (plus y z ))))" of
+s2p :: String -> Program
+s2p str = 
+  case parseString parseProgram mempty str of
     Success x -> x
     Failure doc -> error $ show doc
+  
+programs = 
+  [ "(lambda (x) x)"
+  , "(lambda (x) (fold x 0 (lambda (y z) (plus y z))))"
+  ]  
   
 spec :: Spec
 spec = do
   describe "sbv converter" $ do
-    prop "works identically on Integers" $ \x -> 
-      Just (exec prog2 x) == Just (exec prog2 x)
-      --unsafeSExec prog2 x
+    forM_ programs $ \src -> do
+      prop ("exec == sExec for " ++ src) $ \x -> 
+        let prog = s2p src in
+        Just (exec prog x) == unsafeSExec prog x
 
 
