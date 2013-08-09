@@ -25,7 +25,7 @@ getSomeOps size = do
 main :: IO ()
 main = do
   forM_ [3..] $ \size -> do
-    replicateM_ 3 $ do
+    replicateM_ (round $ 1.5^size) $ do
       ops <- getSomeOps size
       print (size, ops)
       let progs = genProgram size ops
