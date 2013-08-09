@@ -61,6 +61,7 @@ solve size ops equiv = do
         vs <- replicateM n randomIO
         let xs = [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ vs
         let res  = [ (map (eval p) xs, Endo (p:)) | p <- ss]
+            mm :: M.Map [Word64] (Endo [Program])
             mm   = M.fromListWith mappend res
             freq = maximum $ map (length . retract) $ M.elems mm
         if freq <= mismatchTolerance
