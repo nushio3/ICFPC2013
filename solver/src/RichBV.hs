@@ -133,7 +133,7 @@ evalE :: Expression -> [Word64] -> Word64
 evalE (Constant c) _ = c
 evalE (Var ix) env = env !! (ix - 1)
 evalE (If e1 e2 e3) env =
-  if evalE e1 env == 0
+  if evalE e1 env c== 0
     then evalE e2 env
     else evalE e3 env
 evalE (Fold e1 e2 e3) env =
