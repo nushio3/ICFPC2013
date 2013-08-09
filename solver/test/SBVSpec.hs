@@ -46,7 +46,6 @@ spec :: Spec
 spec = do
   describe "sbv converter" $ do
     prop "works identically on Integers" $ \x -> 
-      Just (exec prog2 x) == Just (exec prog2 x)
-      --unsafeSExec prog2 x
+      Just (exec prog2 x) == unsafeSExec prog2 x
 
 
