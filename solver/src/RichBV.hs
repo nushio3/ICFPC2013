@@ -2,24 +2,20 @@
 
 module RichBV where
 
-import Data.Aeson
-import qualified Data.ByteString.Lazy.Char8 as L
-import Control.Lens.Aeson
-import Control.Lens
-import Data.List
-import Data.Function
 import Control.Applicative
 import Control.Monad
-import Debug.Trace (trace)
+import Control.Lens.Aeson
+import Control.Lens
+
+import Data.Aeson
+import Data.List
 import Data.Word
 import Data.Text.Lens
 import Data.Bits
 import Data.Monoid
 import System.Random
-import Text.Printf
-import qualified Data.Set as S
+import Text.Printf ()
 import qualified Data.Map.Strict as M
-import Control.Lens.Internal.Context
 
 solve' :: Value -> IO (Maybe (Context [Word64] [Word64] String))
 solve' p = do
@@ -27,12 +23,15 @@ solve' p = do
       ops  = p ^.. key "operators"._Array.traverse._String.unpacked
   solve size ops
 
-
 mismatchTolerance :: Int
 mismatchTolerance = 60
 
 retryTimes :: Int
 retryTimes = 1000
+
+retract :: Endo [a] -> [a]
+retract (Endo f) = f []
+{-# INLINE retract #-}
 
 solve :: Int -> [String] -> IO (Maybe (Context [Word64] [Word64] String))
 solve size ops = do
@@ -49,9 +48,9 @@ solve size ops = do
         let xs = [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ vs
         let res  = [ (map (eval p) xs, Endo (p:)) | p <- ss]
             mm   = M.fromListWith mappend res
-            freq = maximum $ map (length . flip appEndo []) $ M.elems mm
+            freq = maximum $ map (length . retract) $ M.elems mm
         if freq <= mismatchTolerance
-          then return $ Just $ Context (\vs -> printProgram $ ms M.! head (appEndo (mm M.! vs) [])) xs
+          then return $ Just $ Context (\vs -> printProgram $ ms M.! head (retract (mm M.! vs))) xs
           else do
             if i > retryTimes
               then return Nothing
@@ -74,6 +73,7 @@ data Expression =
 data Op = If0 | TFold | Fold0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus
   deriving (Eq, Show, Ord, Read)
 
+printProgram :: Program -> String
 printProgram (Program e) = "(lambda (x0) " ++ f e ++ ")" where
   f (Constant n) | n == 0 || n == 1 = show n
   f (Var ix) = "x" ++ show ix
@@ -215,6 +215,8 @@ simplifyE (Op2 op e1 e2) = case (op, simplifyE e1, simplifyE e2) of
 
   (_, e1', e2') -> Op2 op (min e1' e2') (max e1' e2')
 
+  
+destructFold :: Int -> Int -> Expression -> Expression -> Expression -> Expression
 destructFold x y l v e = simplifyE e8    
   where
     l' = simplifyE l
@@ -236,6 +238,7 @@ destructFold x y l v e = simplifyE e8
     e7 = subst x y l6 e6 e
     e8 = subst x y l7 e7 e
 
+subst :: Int -> Int -> Expression -> Expression -> Expression -> Expression
 subst x y ex ey e = f e where
   f (Constant c) = Constant c
   f (Var i)
