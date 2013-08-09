@@ -95,7 +95,7 @@ data Problem = Problem
     , problemOperators :: [Text]
     , isSolved :: Maybe Bool
     , timeLeft :: Maybe Int
-    }
+    } deriving (Show)
 
 data EvalStatus = EvalOk | EvalError deriving (Show)
 
@@ -114,7 +114,7 @@ data Guess = Guess
     , guessProgram :: Text
     }
 
-data GuessStatus = GuessWin | GuessMismatch | GuessError deriving (Show)
+data GuessStatus = GuessWin | GuessMismatch | GuessError deriving (Eq, Show)
 data GuessResponse = GuessResponse
     { guessStatus :: GuessStatus
     , guessValues :: Maybe [Text]

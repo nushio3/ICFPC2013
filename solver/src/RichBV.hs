@@ -9,7 +9,6 @@ import Control.Lens
 
 import Data.Aeson
 import Data.List
-import Control.Monad
 import Data.Word
 import Data.Text.Lens
 import Data.Bits
@@ -21,7 +20,7 @@ import Data.Function
 -- $setup
 -- >>> import Data.SBV
 
-solve' :: Value -> IO (Maybe (Context [Word64] [Word64] String))
+solve' :: Value -> IO (Maybe (Context [Word64] [Word64] [String]))
 solve' p = do
   let size = p ^?! key "size"._Integer.from enum
       ops  = p ^.. key "operators"._Array.traverse._String.unpacked
@@ -31,10 +30,10 @@ solve' p = do
 -- Q.E.D.
 
 mismatchTolerance :: Int
-mismatchTolerance = 60
+mismatchTolerance = 50
 
 retryTimes :: Int
-retryTimes = 1000
+retryTimes = 100
 
 retract :: Endo [a] -> [a]
 retract (Endo f) = f []
@@ -43,7 +42,7 @@ retract (Endo f) = f []
 optimize :: Program -> Program
 optimize = canonic.simplify.moveOp2P.moveIfP.simplify.moveOp2P.moveIfP.simplify.canonic -- .destructFold
 
-solve :: Int -> [String] -> (Program -> Program -> IO Bool) -> IO (Maybe (Context [Word64] [Word64] String))
+solve :: Int -> [String] -> (Program -> Program -> IO Bool) -> IO (Maybe (Context [Word64] [Word64] [String]))
 solve size ops equiv = do
   let ps = genProgram (fromIntegral size) $ map toOp ops
       qs = map optimize ps
@@ -56,9 +55,9 @@ solve size ops equiv = do
   --mapM_ (print . printProgram) ss
 
   let go i = do
-        n <- randomRIO (1, 100)
+        let n = 256
         vs <- replicateM n randomIO
-        let xs = [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ vs
+        let xs = take n $ [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ vs
         let res  = [ (map (eval p) xs, Endo (p:)) | p <- ss]
             mm   = M.fromListWith mappend res
             freq = maximum $ map (length . retract) $ M.elems mm
@@ -66,24 +65,26 @@ solve size ops equiv = do
           then do
             --let tt = map (retract . snd) $ reverse $ sortBy (compare `on` (length . retract . snd)) $ M.toList mm
             --mapM_ (print . map printProgram) tt
-            return $ Just $ Context (\vss -> printProgram $ ms M.! head (retract $ mm M.! vss)) xs
+            return $ Just $ Context (\vss -> [ printProgram $ ms M.! cand | cand <- retract $ mm M.! vss]) xs
           else do
             if i > retryTimes
               then do
                 let tt = retract $ snd $ head $ reverse $ sortBy (compare `on` (length . retract . snd)) $ M.toList mm
-                putStrLn $ "Group size: " ++ show (length tt)
-                forM_ (zip [1..] tt) $ \(i, x) -> forM_ (zip [1..] tt) $ \(j, y) -> do
-                  when (i < j) $ do
+                putStrLn "Cannot divide groups"
+                putStrLn $ "Maximum group size: " ++ show (length tt)
+                {-
+                forM_ (zip [1::Int ..] tt) $ \(ii, x) -> forM_ (zip [1..] tt) $ \(jj, y) -> do
+                  when (ii < jj) $ do
                     b <- x `equiv` y
                     when b $ do
                       putStrLn $ printProgram x
                       putStrLn $ printProgram y
                       putStrLn "==="
-
+                -}
                 return Nothing
               else go (i + 1)
 
-  go 0 :: IO (Maybe (Context [Word64] [Word64] String))
+  go 0 :: IO (Maybe (Context [Word64] [Word64] [String]))
 
 data Program = Program Expression
   deriving (Eq, Show, Ord, Read)
