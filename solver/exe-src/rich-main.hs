@@ -32,7 +32,7 @@ solveAndAnswer tid size ops = do
                   putStrLn "guess mismatch, retry other answer..."
                   go xs
                 else do
-                  fail $ "guess error: " ++ show tid
+                  fail $ "guess error: " ++ show (x, res)
       Just <$> go (restore eout)
     Nothing -> do
       putStrLn $ "cannot solve: " ++ show tid
