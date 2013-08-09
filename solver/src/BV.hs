@@ -37,11 +37,11 @@ parseReducer = parens $ do
 
 parseExpr = choice [try $ parens $ symbol "if0" >> If0 <$> parseExpr <*> parseExpr <*> parseExpr
     , try $ parens $ symbol "fold" >> Fold <$> parseExpr <*> parseExpr <*> parseReducer
-    , parens $ Op2 <$> parseOp2 <*> parseExpr <*> parseExpr
-    , parens $ Op1 <$> parseOp1 <*> parseExpr
+    , try $ parens $ Op2 <$> parseOp2 <*> parseExpr <*> parseExpr
+    , try $ parens $ Op1 <$> parseOp1 <*> parseExpr
     , token $ C0 <$ symbol "0"
     , token $ C1 <$ symbol "1"
-    , Var <$> identifier
+    , try $ Var <$> identifier
     ]
 
 parseOp1 = token $ choice [Not <$ symbol "not"

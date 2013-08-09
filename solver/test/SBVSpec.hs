@@ -7,6 +7,7 @@ import Data.Maybe
 import Data.Monoid (mempty)
 import Data.SBV
 import System.IO.Unsafe
+import System.Environment (lookupEnv)
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Text.Trifecta (parseString, Result(..))
@@ -39,10 +40,18 @@ s2p str =
     Success x -> x
     Failure doc -> error $ show doc
   
-programs = 
-  [ "(lambda (x) x)"
-  , "(lambda (x) (fold x 0 (lambda (y z) (plus y z))))"
-  ]  
+programs :: [String]
+programs = unsafePerformIO $ do
+  env <- lookupEnv "test_file"
+  case env of
+    Nothing -> return defs
+    Just fn -> do
+      xs <- readFile fn
+      return $ filter (not . null) $ lines xs
+  where
+    defs = [ "(lambda (x) x)"
+           , "(lambda (x) (fold x 0 (lambda (y z) (plus y z))))"
+           ]  
   
 spec :: Spec
 spec = do
