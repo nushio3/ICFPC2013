@@ -1,12 +1,7 @@
 {-# LANGUAGE OverloadedStrings, LambdaCase, FlexibleContexts #-}
 import RichBV
 
-import qualified Data.ByteString.Lazy.Char8 as L
-import Control.Lens.Aeson
 import Control.Lens
-import Data.Aeson
-import Data.List
-import Data.Function
 import Control.Monad
 import Control.Applicative
 import Data.Reflection
@@ -16,12 +11,10 @@ import System.Environment
 import SRichBV (equiv)
 import API
 
-import Control.Lens.Internal.Context
-
 solveAndAnswer :: Given Token => T.Text -> Int -> [T.Text] -> IO (String, GuessResponse)
 solveAndAnswer tid size ops = do
     Just (Context restore query) <- solve size $ map T.unpack ops
-    EvalResponse estat (Just eout) emsg <- API.eval
+    EvalResponse _ (Just eout) _ <- API.eval
         $ EvalRequest (Just tid) Nothing
         $ map (T.pack . printf "0x%016X") query
     let answer = restore eout

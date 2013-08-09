@@ -2,24 +2,20 @@
 
 module RichBV where
 
-import Data.Aeson
-import qualified Data.ByteString.Lazy.Char8 as L
-import Control.Lens.Aeson
-import Control.Lens
-import Data.List
-import Data.Function
 import Control.Applicative
 import Control.Monad
-import Debug.Trace (trace)
+import Control.Lens.Aeson
+import Control.Lens
+
+import Data.Aeson
+import Data.List
+import Control.Monad
 import Data.Word
 import Data.Text.Lens
 import Data.Bits
 import Data.Monoid
 import System.Random
-import Text.Printf
-import qualified Data.Set as S
 import qualified Data.Map.Strict as M
-import Control.Lens.Internal.Context
 
 -- $setup
 -- >>> import Data.SBV
@@ -30,7 +26,6 @@ solve' p = do
       ops  = p ^.. key "operators"._Array.traverse._String.unpacked
   solve size ops
 
-
 -- >>> prove $ forAll_ $ \x -> x*2 .== x+(x :: SWord64)
 -- Q.E.D.
 
@@ -39,6 +34,10 @@ mismatchTolerance = 60
 
 retryTimes :: Int
 retryTimes = 1000
+
+retract :: Endo [a] -> [a]
+retract (Endo f) = f []
+{-# INLINE retract #-}
 
 solve :: Int -> [String] -> IO (Maybe (Context [Word64] [Word64] String))
 solve size ops = do
@@ -55,9 +54,11 @@ solve size ops = do
         let xs = [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ vs
         let res  = [ (map (eval p) xs, Endo (p:)) | p <- ss]
             mm   = M.fromListWith mappend res
-            freq = maximum $ map (length . flip appEndo []) $ M.elems mm
+            freq = maximum $ map (length . retract) $ M.elems mm
         if freq <= mismatchTolerance
-          then return $ Just $ Context (\vs -> printProgram $ ms M.! head (appEndo (mm M.! vs) [])) xs
+          then do
+            mapM_ print $ zip (M.keys mm) (map (head . retract) $ M.elems mm)
+            return $ Just $ Context (\vss -> printProgram $ ms M.! head (retract $ mm M.! vss)) xs
           else do
             if i > retryTimes
               then return Nothing
@@ -80,13 +81,15 @@ data Expression =
 data Op = If0 | TFold | Fold0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus
   deriving (Eq, Show, Ord, Read)
 
+printProgram :: Program -> String
 printProgram (Program e) = "(lambda (x0) " ++ f e ++ ")" where
   f (Constant n) | n == 0 || n == 1 = show n
-  f (Var ix) = "x" ++ show ix
-  f (If c t e) = "(if0 " ++ f c ++ " " ++ f t ++ " " ++ f e ++ ")"
-  f (Fold i j l v e) = "(fold " ++ f l ++ " " ++ f v ++ " (lambda (x" ++ show i ++ " x" ++ show j ++ ") " ++ f e ++ ")"
-  f (Op1 op e) = "(" ++ g op ++ " " ++ f e ++ ")"
-  f (Op2 op e1 e2) = "(" ++ g op ++ " " ++ f e1 ++ " " ++ f e2 ++ ")"
+  f (Var ixx) = "x" ++ show ixx
+  f (If c t ee) = "(if0 " ++ f c ++ " " ++ f t ++ " " ++ f ee ++ ")"
+  f (Fold i j l v ee) = "(fold " ++ f l ++ " " ++ f v ++ " (lambda (x" ++ show i ++ " x" ++ show j ++ ") " ++ f ee ++ ")"
+  f (Op1 opr ee) = "(" ++ g opr ++ " " ++ f ee ++ ")"
+  f (Op2 opr e1 e2) = "(" ++ g opr ++ " " ++ f e1 ++ " " ++ f e2 ++ ")"
+  f _ = undefined
 
   g If0 = "if0"
   g Fold0 = "fold"
@@ -99,6 +102,7 @@ printProgram (Program e) = "(lambda (x0) " ++ f e ++ ")" where
   g Or = "or"
   g Xor = "xor"
   g Plus = "plus"
+  g _ = undefined
 
 canonic :: Program -> Program
 canonic (Program e) = Program $ canonical e
@@ -108,8 +112,8 @@ canonical (Constant c) = Constant c
 canonical (Var n) = Var n
 canonical (If p e1 e2) = If p (min e1 e2) (max e1 e2)
 canonical (Fold x y v e1 e2) = Fold x y v (min e1 e2) (max e1 e2)
-canonical (Op1 op e) = Op1 op e
-canonical (Op2 op e1 e2) = Op2 op (min e1 e2) (max e1 e2)
+canonical (Op1 opr e) = Op1 opr e
+canonical (Op2 opr e1 e2) = Op2 opr (min e1 e2) (max e1 e2)
 
 moveIfP :: Program -> Program
 moveIfP (Program e) = Program $ moveIf e
@@ -118,20 +122,21 @@ moveIf :: Expression -> Expression
 moveIf (Constant c) = Constant c
 moveIf (Var x) = Var x
 moveIf (If p t e) = If (moveIf p) (moveIf t) (moveIf e)
-moveIf (Op1 op e) = case moveIf e of
-  If p t e -> moveIf $ If p (Op1 op t) (Op1 op e)
-  e' -> Op1 op e'
-moveIf (Op2 op e1 e2) = case (moveIf e1, moveIf e2) of
-  (If p t e, e2') -> moveIf $ If p (Op2 op t e2') (Op2 op e e2')
-  (e1', If p t e) -> moveIf $ If p (Op2 op e1' t) (Op2 op e1' e)
-  (e1', e2') -> Op2 op e1 e2
+moveIf (Op1 opr e) = case moveIf e of
+  If p t ee -> moveIf $ If p (Op1 opr t) (Op1 opr ee)
+  e' -> Op1 opr e'
+moveIf (Op2 opr e1 e2) = case (moveIf e1, moveIf e2) of
+  (If p t e, e2') -> moveIf $ If p (Op2 opr t e2') (Op2 opr e e2')
+  (e1', If p t e) -> moveIf $ If p (Op2 opr e1' t) (Op2 opr e1' e)
+  (e1', e2') -> Op2 opr e1' e2'
+moveIf _ = undefined
 
 moveOp2P :: Program -> Program
 moveOp2P (Program e) = Program $ moveOp2 e
 
 moveOp2 :: Expression -> Expression
 moveOp2 (If p t e) = If (moveOp2 p) (moveOp2 t) (moveOp2 e)
-moveOp2 (Op2 op e1 e2) = Op2 op (moveOp2 e1) (moveOp2 e2)
+moveOp2 (Op2 opr e1 e2) = Op2 opr (moveOp2 e1) (moveOp2 e2)
 moveOp2 (Op1 Not e) = case moveOp2 e of
   Op2 And  e1 e2 -> Op2 Or (moveOp2 $ Op1 Not e1) (moveOp2 $ Op1 Not e2)
   Op2 Or   e1 e2 -> Op2 And (moveOp2 $ Op1 Not e1) (moveOp2 $ Op1 Not e2)
@@ -168,8 +173,8 @@ simplifyE (Fold x y e1 e2 e3) =
   -- Fold x y (simplifyE e1) (simplifyE e2) (simplifyE e3)
   destructFold x y e1 e2 e3
 
-simplifyE (Op1 op e) = case (op, simplifyE e) of
-  (_, Constant v) -> Constant $ evalOp1 op v
+simplifyE (Op1 opr e) = case (opr, simplifyE e) of
+  (_, Constant v) -> Constant $ evalOp1 opr v
 
   (Not, Op1 Not e') -> simplifyE e'
 
@@ -180,10 +185,10 @@ simplifyE (Op1 op e) = case (op, simplifyE e) of
   (Shr n, _) | n >= 64 -> Constant 0
   (Shr n, e') | lessThan (2^n) e' -> Constant 0
 
-  (_, e') -> Op1 op e'
+  (_, e') -> Op1 opr e'
 
-simplifyE (Op2 op e1 e2) = case (op, simplifyE e1, simplifyE e2) of
-  (_, Constant v1, Constant v2) -> Constant $ evalOp2 op v1 v2
+simplifyE (Op2 opr e1 e2) = case (opr, simplifyE e1, simplifyE e2) of
+  (_, Constant v1, Constant v2) -> Constant $ evalOp2 opr v1 v2
 
   -- And absorption
   (And, Constant 0, _) -> Constant 0
@@ -219,8 +224,9 @@ simplifyE (Op2 op e1 e2) = case (op, simplifyE e1, simplifyE e2) of
   (Plus, e1', Constant 0) -> e1'
   (Plus, e1', e2') | e1' == e2' -> simplifyE $ Op1 (Shl 1) e1'
 
-  (_, e1', e2') -> Op2 op (min e1' e2') (max e1' e2')
+  (_, e1', e2') -> Op2 opr (min e1' e2') (max e1' e2')
 
+destructFold :: Int -> Int -> Expression -> Expression -> Expression -> Expression
 destructFold x y l v e = simplifyE e8    
   where
     l' = simplifyE l
@@ -242,17 +248,19 @@ destructFold x y l v e = simplifyE e8
     e7 = subst x y l6 e6 e
     e8 = subst x y l7 e7 e
 
+subst :: Int -> Int -> Expression -> Expression -> Expression -> Expression
 subst x y ex ey e = f e where
   f (Constant c) = Constant c
   f (Var i)
     | i == x = ex
     | i == y = ey
     | otherwise = Var i
-  f (If x y z) = If (f x) (f y) (f z)
-  f (Fold i j x y z) = Fold i j (f x) (f y) (f z)
-  f (Op1 op e) = Op1 op (f e)
-  f (Op2 op e1 e2) = Op2 op (f e1) (f e2)
+  f (If xx yy zz) = If (f xx) (f yy) (f zz)
+  f (Fold i j xx yy zz) = Fold i j (f xx) (f yy) (f zz)
+  f (Op1 opr e1) = Op1 opr (f e1)
+  f (Op2 opr e1 e2) = Op2 opr (f e1) (f e2)
 
+lessThan :: Word64 -> Expression -> Bool
 lessThan ub e = case simplifyE e of
   Constant c | c < ub -> True
   If _ e1 e2 | lessThan ub e1 && lessThan ub e2 -> True
@@ -269,28 +277,33 @@ eval (Program e) x = evalE e [x]
 
 evalE :: Expression -> [Word64] -> Word64
 evalE (Constant c) _ = c
-evalE (Var ix) env = env !! ix
+evalE (Var ixx) env = env !! ixx
 evalE (If e1 e2 e3) env =
   if evalE e1 env == 0
     then evalE e2 env
     else evalE e3 env
-evalE (Fold x y e1 e2 e3) env =
+evalE (Fold _ _ e1 e2 e3) env =
   let v = map (`mod` 0x100) $ reverse $ take 8 $ iterate (`shiftR` 8) $ evalE e1 env
   in foldr (\w a -> evalE e3 $ env ++ [w, a]) (evalE e2 env) v
-evalE (Op1 op e) env =
-  evalOp1 op $ evalE e env
-evalE (Op2 op e1 e2) env =
-  evalOp2 op (evalE e1 env) (evalE e2 env)
+evalE (Op1 opr e) env =
+  evalOp1 opr $ evalE e env
+evalE (Op2 opr e1 e2) env =
+  evalOp2 opr (evalE e1 env) (evalE e2 env)
 
+evalOp1 :: Op -> Word64 -> Word64
 evalOp1 Not     = complement
 evalOp1 (Shl n) = (`shiftL` n)
 evalOp1 (Shr n) = (`shiftR` n)
+evalOp1 _ = undefined
 
+evalOp2 :: Op -> Word64 -> Word64 -> Word64
 evalOp2 And  = (.&.)
 evalOp2 Or   = (.|.)
 evalOp2 Xor  = xor
 evalOp2 Plus = (+)
+evalOp2 _ = undefined
 
+toOp :: String -> Op
 toOp "not"   = Not
 toOp "shl1"  = Shl 1
 toOp "shr1"  = Shr 1
@@ -303,6 +316,7 @@ toOp "plus"  = Plus
 toOp "if0"   = If0
 toOp "fold"  = Fold0
 toOp "tfold" = TFold
+toOp _ = undefined
 
 isOp1 :: Op -> Bool
 isOp1 Not   = True
