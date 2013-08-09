@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module ConvertSpec (spec) where
+module SimplifySpec (spec) where
 
 import Control.Monad
 import Data.List (isInfixOf, isPrefixOf)
@@ -32,18 +32,18 @@ programs = unsafePerformIO $ do
   
 spec :: Spec
 spec = do
-  describe "equality of enrichment" $ do
+  describe "simplification" $ do
     forM_ programs $ \src -> do
-      prop ("BV.exec == RichBV.eval for " ++ src) $ \x -> 
+      prop ("prog == simplify prog for " ++ src) $ \x -> 
         let 
           prog = unsafePerformIO $ do
-            let ret=readProgram src 
-            --print ret
+            let ret=enrichProgram $ readProgram src 
+            print ret
             return ret
           prog' = unsafePerformIO $ do
-            let ret = enrichProgram $ readProgram src 
-            --print ret
+            let ret = R.simplify $  prog
+            print ret
             return ret
         in
-        B.exec prog x == R.eval prog' x 
+        R.eval prog x == R.eval prog' x 
 

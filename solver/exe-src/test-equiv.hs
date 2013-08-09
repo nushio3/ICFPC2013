@@ -1,8 +1,20 @@
 module Main where
 
 import Data.SBV
-import SBV (sExec)
-import Convert (readProgram)
+import SRichBV (equiv)
+import Convert (readProgram, enrichProgram)
+
+main :: IO ()
+main = do
+  prog1 `equiv` prog2 >>= print
+  where
+    rp = enrichProgram . readProgram
+    
+    prog1 = rp "(lambda (x) (if0 1          0 1))"
+    prog2 = rp "(lambda (x) (if0 (plus x x) 0 1))"            
+
+
+{-
 
 main :: IO ()
 main = do
@@ -22,3 +34,4 @@ main = do
 --    prog2 = readProgram "(lambda (x) (fold x 0 (lambda (z y) (plus y z ))))"    
     prog1 = readProgram "(lambda (x) (if0 1          0 1))"
     prog2 = readProgram "(lambda (x) (if0 (plus x x) 0 1))"        
+-}

@@ -10,9 +10,11 @@ import Data.List
 import Data.Function
 import Control.Applicative
 import Control.Monad
+import Debug.Trace (trace)
 import Data.Word
 import Data.Bits
 import System.Random
+import Text.Printf
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 
@@ -134,7 +136,21 @@ simplifyE (Op2 op e1 e2) = case (op, simplifyE e1, simplifyE e2) of
 
   (_, e1', e2') -> Op2 op (min e1' e2') (max e1' e2')
 
-destructFold x y l v e = simplifyE e8
+destructFold x y l v e = 
+  trace (printf "x={%s}" $ show x)$ 
+  trace (printf "y={%s}" $ show y)$ 
+  trace (printf "l={%s}" $ show l)$ 
+  trace (printf "v={%s}" $ show v)$ 
+  trace (printf "e={%s}" $ show e)$ 
+  trace (printf "l0={%s}" $ show l0)$ 
+  trace (printf "l1={%s}" $ show l1)$ 
+  trace (printf "l2={%s}" $ show l2)$   
+  trace (printf "l3={%s}" $ show l3)$   
+  trace (printf "e0={%s}" $ show e0)$ 
+  trace (printf "e1={%s}" $ show e1)$ 
+  trace (printf "e2={%s}" $ show e2)$   
+  trace (printf "e3={%s}" $ show e3)$ 
+  simplifyE e8    
   where
     l' = simplifyE l
     l0 = Op2 And l' (Constant 255)
