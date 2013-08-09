@@ -29,8 +29,8 @@ convE m (B.Fold a b (B.Reducer x y e)) =
   let m2 = m & at x ?~ n & at y ?~ (n+1) 
       n = Map.size m2
   in
-  R.Fold (convE m a) (convE m b)                                         
-    (convE m2 e)
+  R.Fold n (n+1)
+    (convE m a) (convE m b) (convE m2 e)
 convE m (B.Op1 B.Not e) = R.Op1 R.Not (convE m e)  
 convE m (B.Op1 B.Shl1 e) = R.Op1 (R.Shl 1) (convE m e)  
 convE m (B.Op1 B.Shr1 e) = R.Op1 (R.Shr 1) (convE m e)  
