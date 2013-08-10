@@ -20,10 +20,12 @@ library
     SBV
     RichBV
     SRichBV
-
     SBVTools
     Convert
     API
+
+    Gulwani2
+
 
   hs-source-dirs:    src/  
   -- other-modules:       
@@ -133,3 +135,29 @@ executable survey-equiv
     , solver
     , sbv
     , random
+
+
+executable survey-gul
+  Hs-Source-Dirs: exe-src
+  Ghc-Options: -Wall -O2
+  Main-Is: survey-gul.hs
+  Other-Modules: 
+                    
+  Build-Depends: 
+      base ==4.*
+    , solver
+    , sbv
+    , time
+    , random
+
+
+executable survey-expr
+  Hs-Source-Dirs: exe-src
+  Ghc-Options: -Wall -O2
+  Main-Is: survey-expr.hs
+  Other-Modules: 
+                    
+  Build-Depends: 
+      base ==4.*
+    , solver
+    , sbv
