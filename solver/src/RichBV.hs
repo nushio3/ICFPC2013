@@ -75,13 +75,13 @@ solve size ops equiv = do
                 putStrLn "Cannot divide groups"
                 putStrLn $ "Maximum group size: " ++ show (length tt)
 
-                forM_ (zip [1::Int ..] tt) $ \(ii, x) -> forM_ (zip [1..] tt) $ \(jj, y) -> do
-                  when (ii < jj) $ do
-                    b <- x `equiv` y
-                    when b $ do
-                      putStrLn $ printProgram x
-                      putStrLn $ printProgram y
-                      putStrLn "==="
+--                 forM_ (zip [1::Int ..] tt) $ \(ii, x) -> forM_ (zip [1..] tt) $ \(jj, y) -> do
+--                   when (ii < jj) $ do
+--                     b <- x `equiv` y
+--                     when b $ do
+--                       putStrLn $ printProgram x
+--                       putStrLn $ printProgram y
+--                       putStrLn "==="
 
                 putStrLn "Trying to resolve..."
                 let res1  = [ (map (eval p) xs, Endo (merger p)) | p <- ss] 
@@ -196,6 +196,7 @@ simplifyE (Var i) = Var i
 simplifyE (If p e1 e2) = case (simplifyE p, simplifyE e1, simplifyE e2) of
   (Constant 0, e1', _) -> e1'
   (Constant _, _, e2') -> e2'
+  (Op1 Not pr, e1, e2) -> simplifyE (If pr e2 e1)
   (_, e1', e2') | canonical e1' == canonical e2' -> e1'
 
   (c', e1', _) | isZero c' -> e1'

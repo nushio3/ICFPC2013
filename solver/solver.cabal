@@ -20,10 +20,13 @@ library
     SBV
     RichBV
     SRichBV
-
     SBVTools
     Convert
     API
+    Database
+
+    Gulwani2
+
 
   hs-source-dirs:    src/  
   -- other-modules:       
@@ -109,6 +112,29 @@ executable rich-main
     , sbv == 2.10.*
     , reflection
     , text
+    , containers
+
+
+executable rich-main-old
+  Hs-Source-Dirs: exe-src
+  Ghc-Options: -Wall -O2
+  Main-Is: rich-main-old.hs
+  Other-Modules: 
+                    
+  Build-Depends: 
+      base ==4.*
+    , aeson
+    , bytestring
+    , lens
+    , lens-aeson
+    , random
+    , solver
+    , safe
+    , sbv == 2.10.*
+    , reflection
+    , text
+    , containers
+
 
   buildable: False
 
@@ -154,5 +180,35 @@ executable survey-equiv
     , solver
     , sbv
     , random
+
+  buildable: False
+
+executable survey-gul
+  Hs-Source-Dirs: exe-src
+  Ghc-Options: -Wall -O2
+  Main-Is: survey-gul.hs
+  Other-Modules: 
+                    
+  Build-Depends: 
+      base ==4.*
+    , solver
+    , sbv
+    , time
+    , random
+
+  buildable: False
+
+executable survey-expr
+  Hs-Source-Dirs: exe-src
+  Ghc-Options: -Wall -O2
+  Main-Is: survey-expr.hs
+  Other-Modules: 
+                    
+  Build-Depends: 
+      base ==4.*
+    , solver
+    , sbv
+    , containers
+    , lens
 
   buildable: False
