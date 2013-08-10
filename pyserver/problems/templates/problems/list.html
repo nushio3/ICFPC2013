@@ -15,12 +15,12 @@
   </span>
   <span>
     {% if autoload_status %}
-    <form action="{% url 'problems:setreload' status=False %}" method="post">
+    <form action="/problems/setreload/False/" method="post">
       {% csrf_token %}
       <input type="submit" value="Set autoload Off" />
     </form>
     {% else %}
-    <form action="{% url 'problems:setreload' status=True %}" method="post">
+    <form action="/problems/setreload/True/" method="post">
       {% csrf_token %}
       <input type="submit" value="Set autoload On" />
     </form>
