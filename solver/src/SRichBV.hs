@@ -74,3 +74,20 @@ equiv ::  Program -> Program -> IO Bool
 equiv prog1 prog2 = do
   resp <- prove $ \x -> sExec prog1 x .== sExec prog2 x
   return $ "Q.E.D." `isInfixOf` show resp
+
+equivNeq ::  Program -> Program -> IO (Maybe BitVector)
+equivNeq prog1 prog2 = do
+  resp <- prove $ do
+    x <- forall "inputVal"
+    return $ sExec prog1 x .== sExec prog2 x
+  if not $ "Falsifiable." `isInfixOf` show resp
+    then return Nothing
+    else (do
+      let atari = 
+            read $
+            (!!2)$
+            words$
+            head $
+            filter (isInfixOf "inputVal") $ 
+            lines $ show resp
+      return $ Just atari)
