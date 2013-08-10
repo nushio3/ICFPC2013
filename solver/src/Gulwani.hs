@@ -85,7 +85,7 @@ behaveB2 x y
       load addr = select [x,tmp0] 0 addr in      
   (a0 .<= 0) &&&     
   (b0 .<= 0) &&&     
-  (a1 .<= 1) &&&     
-  (b1 .<= 1) &&&     
+  (a1 .<= 1) &&&     --
+  (b1 .<= 1) &&&     --
   deInstB inst0 (load a0) (load b0) tmp0  &&&
-  deInstB inst1 (load a1) (load b1) y    
+  deInstB inst1 (load a1) (load b1) y    ---
