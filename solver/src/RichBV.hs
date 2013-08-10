@@ -34,7 +34,7 @@ mismatchTolerance :: Int
 mismatchTolerance = 50
 
 retryTimes :: Int
-retryTimes = 100
+retryTimes = 10
 
 retract :: Endo [a] -> [a]
 retract (Endo f) = f []
@@ -415,8 +415,8 @@ isOp2 _ = False
 
 genProgram :: Int -> [Op] -> [Program]
 genProgram size ops = do
-  (s, [], e) <- genExpression (size - 1) ops ops 1
-  guard $ s == size - 1
+  (_s, [], e) <- genExpression (size - 1) ops ops 1
+  -- guard $ s == size - 1
   return $ Program e
 
 genExpression :: Int -> [Op] -> [Op] -> Int -> [(Int, [Op], Expression)]
@@ -427,8 +427,11 @@ genExpression size ops unused vars
     let u0 = unused \\ [TFold, Fold0]
         o0 = ops \\ [TFold, Fold0]
     (s1, u1, e1) <- genExpression (size - 2) o0 u0 vars
+    guard $ isSimple e1
     (s2, u2, e2) <- genExpression (size - 2 - s1) o0 u1 vars
+    guard $ isSimple e2
     (s3, u3, e3) <- genExpression (size - 2 - s1 - s2) o0 u2 (vars + 2)
+    guard $ isSimple e3
     return (2 + s1 + s2 + s3, u3, Fold vars (vars+1) e1 e2 e3)
 genExpression size ops unused vars =
   [(1, unused, Constant 0), (1, unused, Constant 1)]
@@ -439,25 +442,36 @@ genExpression size ops unused vars =
       guard $ If0 `elem` ops
       let u0 = unused \\ [If0]
       (s1, u1, e1) <- genExpression (size - 1) ops u0 vars
+      guard $ isSimple e1
       (s2, u2, e2) <- genExpression (size - 1 - s1) ops u1 vars
+      guard $ isSimple e2
       (s3, u3, e3) <- genExpression (size - 1 - s1 - s2) ops u2 vars
+      guard $ isSimple e3
       return (1 + s1 + s2 + s3, u3, If e1 e2 e3)
     folds = do
       guard $ Fold0 `elem` ops
       let u0 = unused \\ [Fold0]
           o0 = ops \\ [Fold0]
       (s1, u1, e1) <- genExpression (size - 2) o0 u0 vars
+      guard $ isSimple e1
       (s2, u2, e2) <- genExpression (size - 2 - s1) o0 u1 vars
+      guard $ isSimple e2
       (s3, u3, e3) <- genExpression (size - 2 - s1 - s2) o0 u2 (vars + 2)
+      guard $ isSimple e3
       return (2 + s1 + s2 + s3, u3, Fold vars (vars+1) e1 e2 e3)
     op1s = do
       opr <- filter isOp1 ops
       let u0 = unused \\ [opr]
       (s1, u1, e1) <- genExpression (size - 1) ops u0 vars
+      guard $ isSimple e1
       return (1 + s1, u1, Op1 opr e1)
     op2s = do
       opr <- filter isOp2 ops
       let u0 = unused \\ [opr]
       (s1, u1, e1) <- genExpression (size - 1) ops u0 vars
+      guard $ isSimple e1
       (s2, u2, e2) <- genExpression (size - 1 - s1) ops u1 vars
+      guard $ isSimple e2
       return (1 + s1 + s2, u2, Op2 opr e1 e2)
+
+isSimple e = e == simplifyE e
