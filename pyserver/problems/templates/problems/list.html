@@ -27,6 +27,15 @@
     {% endif %}
   </span>
 </div>
+<h2>Filter</h2>
+<form action="/problems/" method="get">
+  <div>Select forms having operators:
+    <input type="text" name="with" value="{{ with }}" /></div>
+  <div>Select forms which don't have operators:
+    <input type="text" name="without" value="{{ without }}" /></div>
+  <div><input type="submit" value="filter" />
+    <input type="reset" value="Clear" /></div>
+</form>
 <h2>Contents</h2>
 <div class="toc">
 <span><a href="#solving">{{ under_solve_problems|length }} Solving</a></span>
