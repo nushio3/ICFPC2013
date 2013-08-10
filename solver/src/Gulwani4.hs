@@ -62,6 +62,7 @@ testProg = do
 
     phiAddrBound :: Addr -> SBool
     phiAddrBound a = 0 .<= a &&& a .< (fromIntegral n)
+
     
     phiAcyc :: Opaddr Addr -> SBool
     phiAcyc oa = bAll (.<(oa^.ovar)) (oa^.ivars)
@@ -131,8 +132,11 @@ phiFunc lvProg alpha beta = do
       outAddrs :: [Addr]
       outAddrs = map (^.ovar) addrLib
   
+      phiAddrBound :: Addr -> SBool
+      phiAddrBound a = 0 .<= a &&& a .< (fromIntegral n)
   
   return $ 
+    phiAddrBound (lvProg ^. returnAddr) &&&
     bAnd (map phiLib varLib) &&&
     bAnd [ phiConn (allAVs!!i) (allAVs!!j) 
          | i <- [0..nAllAVs-1], j <- [i+1 .. nAllAVs-1]]
