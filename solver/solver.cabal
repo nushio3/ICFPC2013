@@ -113,6 +113,28 @@ executable rich-main
     , containers
 
 
+executable rich-main-old
+  Hs-Source-Dirs: exe-src
+  Ghc-Options: -Wall -O2
+  Main-Is: rich-main.hs
+  Other-Modules: 
+                    
+  Build-Depends: 
+      base ==4.*
+    , aeson
+    , bytestring
+    , lens
+    , lens-aeson
+    , random
+    , solver
+    , safe
+    , sbv == 2.10.*
+    , reflection
+    , text
+    , containers
+
+
+
 executable survey-gen
   Hs-Source-Dirs: exe-src
   Ghc-Options: -Wall -O2
