@@ -71,11 +71,11 @@ ordE2 p1 p2  = do
       
       ret1 <- sat $ \x -> do       
         forAll ["y"] $ \y ->
-          ((x .< y) ==> (sEvalE p1 [y]  .== sEvalE p2 [y])) &&&
+          ((y .< x) ==> (sEvalE p1 [y]  .== sEvalE p2 [y])) &&&
           sEvalE p1 [x]  .< sEvalE p2 [x] 
       ret2 <- sat $ \x -> do       
         forAll ["y"] $ \y ->
-          ((x .< y) ==> (sEvalE p1 [y]  .== sEvalE p2 [y])) &&&
+          ((y .< x) ==> (sEvalE p1 [y]  .== sEvalE p2 [y])) &&&
           sEvalE p1 [x]  .> sEvalE p2 [x] 
       if | "Satisfiable"   `isInfixOf` show ret1 -> return $Just LT
          | "Satisfiable" `isInfixOf` show ret2   -> return $Just GT
@@ -90,7 +90,7 @@ someOps = [ If0 , Shr 1 , And , Or ,Xor]
 
 main :: IO ()
 main = do
-  let exprs = map (^. _3) $ genExpression 5 someOps someOps 1
+  let exprs = map (^. _3) $ genExpression 6 someOps someOps 1
       simpExprs = Set.toList $ Set.fromList $ 
         map simplifyE exprs  
       nubExprs0 = nubBy (\x y -> unsafePerformIO $ equivE x y) simpExprs
