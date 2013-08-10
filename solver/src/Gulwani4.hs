@@ -98,7 +98,7 @@ progOfSize size0 opList0 = do
   return (thmWfp, LVProgram {-  ret -}  addrLib)
 
 testMain a b = do
-  (thmWfp, prog) <- progOfSize 2 [Plus]
+  (thmWfp, prog) <- progOfSize 20 [Plus]
   thmBeh <- phiFunc prog a b
   return $ thmWfp &&& thmBeh
 
