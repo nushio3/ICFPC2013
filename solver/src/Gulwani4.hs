@@ -6,6 +6,7 @@ import Control.Lens hiding ((.>))
 import Control.Lens.TH
 import Control.Monad
 import Data.Bits
+import Data.Char
 import Data.SBV
 import Text.Printf
 
@@ -18,40 +19,58 @@ data Op = Const Int | Var
         | If0 
                            deriving (Eq, Ord, Show, Read)
 
+arity :: Op -> Int
+arity (Const _) = 0
+arity Var       = 0
+arity Not = 1
+arity (Shl _) = 1
+arity (Shr _) = 1
+arity And = 2
+arity Or = 2
+arity Xor = 2
+arity Plus = 2
+arity If0 = 3
 
-data Opaddr a = Opaddr 
-  {_inst :: Op, _ovar :: a, _ivars :: [a]}
+oprToKey :: Op -> String
+oprToKey = filter isAlphaNum . show
+
+data Opvar a = Opvar 
+  { _strkey ::String, -- unique key for printing and searching
+    _inst :: Op,      -- type of instruction
+    _ovar :: a,       -- output
+    _ivars :: [a]     -- inputs
+  }
     
-$(makeLenses ''Opaddr)  
+$(makeLenses ''Opvar)  
 
 
 data LVProgram = 
   LVProgram
-    { _returnAddr :: Addr, 
-      _library ::[Opaddr Addr]}
+    { -- _returnAddr :: Addr, 
+      _library ::[Opvar Addr]}
   
 $(makeLenses ''LVProgram)  
 
 
-symbolicOp :: Int -> Op -> Int -> Symbolic (Opaddr Addr)
-symbolicOp i opr arity = do
-  oaddr <- (exists (printf "oa-%d" i) :: Symbolic Addr) 
-  iaddrs <- forM [0..arity-1] $ \j -> 
-    (exists (printf "ia-%d-%d" i j) :: Symbolic Addr) 
-  return $ Opaddr opr oaddr iaddrs
+symbolicOp :: String -> Op -> Symbolic (Opvar Addr)
+symbolicOp key opr  = do
+  oaddr <- (exists (printf "oa-%s" key) :: Symbolic Addr) 
+  iaddrs <- forM [0..arity opr-1] $ \j -> 
+    (exists (printf "ia-%s-%d" key j) :: Symbolic Addr) 
+  return $ Opvar key opr oaddr iaddrs
   
 
 
-testProg :: Symbolic (SBool, LVProgram)
-testProg = do
-  ret <- symbolic "returnAddr"
-  a <- symbolicOp 0 Var 0
-  b <- symbolicOp 1 Plus 2
-  c <- symbolicOp 2 Plus 2
-  let 
-    addrLib :: [Opaddr Addr]
-    addrLib = [a,b,c]
-    n = length addrLib
+progOfSize :: Int -> [Op] -> Symbolic (SBool, LVProgram)
+progOfSize size0 opList0 = do
+  let opList = [Const 0, Const 1, Var] ++ opList0
+      n = length opList * multiplicity
+      multiplicity = size0
+--  ret <- symbolic "returnAddr"
+  addrLib <- fmap concat $ forM opList $
+    \opr -> forM [0..multiplicity-1] $ 
+      \i -> symbolicOp (oprToKey opr++"#"++show i) opr 
+
   let 
     allAddrs :: [Addr]
     allAddrs = map (^.ovar) addrLib
@@ -64,7 +83,7 @@ testProg = do
     phiAddrBound a = 0 .<= a &&& a .< (fromIntegral n)
 
     
-    phiAcyc :: Opaddr Addr -> SBool
+    phiAcyc :: Opvar Addr -> SBool
     phiAcyc oa = bAll (.<(oa^.ovar)) (oa^.ivars)
     
     thmWfp = 
@@ -76,10 +95,10 @@ testProg = do
       -- acyclicity
       bAll phiAcyc addrLib
   
-  return (thmWfp, LVProgram ret addrLib)
+  return (thmWfp, LVProgram {-  ret -}  addrLib)
 
-test a b = do
-  (thmWfp, prog) <- testProg
+testMain a b = do
+  (thmWfp, prog) <- progOfSize 2 [Plus]
   thmBeh <- phiFunc prog a b
   return $ thmWfp &&& thmBeh
 
@@ -90,21 +109,21 @@ phiFunc lvProg alpha beta = do
       addrLib =  lvProg ^. library
       allAddrs = [0..n-1]  
       
-  outVals <- (\k -> zipWithM k allAddrs addrLib) $
-    \i opaddr -> (exists (printf "out-%d" i) :: Symbolic Val) 
+  outVals <- forM addrLib $
+    \opaddr -> (exists (printf "out-%s" (opaddr^.strkey)) :: Symbolic Val)
 
-  varLib <- (\k -> zipWithM k allAddrs addrLib) $
-    \i opaddr -> do
+  varLib <- (flip.flip zipWithM) addrLib allAddrs $
+    \opaddr i -> do
       ivals <- 
-        sequence [ exists (printf "in-%d-%d" i j) :: Symbolic Val 
+        sequence [ exists (printf "in-%s-%d" (opaddr^.strkey) j) :: Symbolic Val 
                  | j <- [0..length (opaddr^.ivars)-1]]
-      return $ Opaddr (opaddr^.inst) (outVals!!i) ivals                 
+      return $ Opvar (opaddr^.strkey) (opaddr^.inst) (outVals!!i) ivals                 
       
   let phiConn :: (Addr,Val) -> (Addr, Val) -> SBool
       phiConn (a1,v1) (a2,v2) = (a1 .== a2) ==> (v1 .== v2)
       
 
-  let phiLib :: Opaddr Val -> SBool
+  let phiLib :: Opvar Val -> SBool
       phiLib opaddr = 
         (opaddr^.ovar) .==
         case (opaddr^.inst, opaddr^.ivars) of
@@ -121,7 +140,8 @@ phiFunc lvProg alpha beta = do
           _              -> undefined
           
   let allAVs :: [(Addr,Val)]
-      allAVs = (lvProg ^. returnAddr, beta):avLibs
+      allAVs = (fromIntegral (n-1), beta):
+               avLibs
       
       nAllAVs = length allAVs
       
@@ -136,7 +156,7 @@ phiFunc lvProg alpha beta = do
       phiAddrBound a = 0 .<= a &&& a .< (fromIntegral n)
   
   return $ 
-    phiAddrBound (lvProg ^. returnAddr) &&&
+--    phiAddrBound (lvProg ^. returnAddr) &&&
     bAnd (map phiLib varLib) &&&
     bAnd [ phiConn (allAVs!!i) (allAVs!!j) 
          | i <- [0..nAllAVs-1], j <- [i+1 .. nAllAVs-1]]
