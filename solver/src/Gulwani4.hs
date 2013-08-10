@@ -97,25 +97,27 @@ progOfSize size0 opList0 = do
   
   return (thmWfp, LVProgram {-  ret -}  addrLib)
 
-testMain a b = do
-  (thmWfp, prog) <- progOfSize 20 [Plus]
-  thmBeh <- phiFunc prog a b
-  return $ thmWfp &&& thmBeh
+testMain examples = do
+  (thmWfp, prog) <- progOfSize 2 [Plus]
+  
+  thmBehs <- (flip. flip zipWithM) [0..] examples $ \i (a,b) -> 
+    phiFunc prog i a b
+  return $ thmWfp &&& bAnd thmBehs
 
 
-phiFunc :: LVProgram -> Val -> Val -> Symbolic SBool
-phiFunc lvProg alpha beta = do
+phiFunc :: LVProgram -> Int -> Val -> Val -> Symbolic SBool
+phiFunc lvProg exampleIdx alpha beta = do
   let n = length $ addrLib
       addrLib =  lvProg ^. library
       allAddrs = [0..n-1]  
       
   outVals <- forM addrLib $
-    \opaddr -> (exists (printf "out-%s" (opaddr^.strkey)) :: Symbolic Val)
+    \opaddr -> (exists (printf "out-%d-%s" exampleIdx (opaddr^.strkey)) :: Symbolic Val)
 
   varLib <- (flip.flip zipWithM) addrLib allAddrs $
     \opaddr i -> do
       ivals <- 
-        sequence [ exists (printf "in-%s-%d" (opaddr^.strkey) j) :: Symbolic Val 
+        sequence [ exists (printf "in-%d-%s-%d" exampleIdx (opaddr^.strkey) j) :: Symbolic Val 
                  | j <- [0..length (opaddr^.ivars)-1]]
       return $ Opvar (opaddr^.strkey) (opaddr^.inst) (outVals!!i) ivals                 
       
