@@ -12,6 +12,7 @@ import Data.List
 import Data.Function
 import SRichBV (equiv)
 import API
+import Data.Bits
 import Data.Word
 import qualified Data.Map as M
 import System.IO.Unsafe
@@ -35,7 +36,8 @@ niceSolve size ops equiv = do
   let go i = do
         let n = 256
         vs <- replicateM n randomIO
-        let xs = take n $ [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ vs
+        let xs = take n $ [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ reverse ( zipWith f [0..] vs)
+            f x y = x .&. 0xff .|. y .&. complement 0xff
         let res0  = [ (map (RichBV.eval p) xs, Endo (p:)) | p <- ss]
             mm0 :: M.Map [Word64] (Endo [Program])
             mm0   = M.fromListWith mappend res0
