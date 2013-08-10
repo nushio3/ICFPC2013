@@ -117,7 +117,7 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
         return ()
 
   ("test" : level : ops) -> do
-    _ <- solve (read level) ops equiv
+    _ <- niceSolve (read level) ops equiv
     return ()
 
   ("submit" : _) -> do
