@@ -53,13 +53,13 @@ niceSolve size ops equiv = do
                 putStrLn "Cannot divide groups"
                 putStrLn $ "Maximum group size: " ++ show (length tt)
 
-                forM_ (zip [1::Int ..] tt) $ \(ii, x) -> forM_ (zip [1..] tt) $ \(jj, y) -> do
-                  when (ii < jj) $ do
-                    b <- x `equiv` y
-                    when b $ do
-                      putStrLn $ printProgram x
-                      putStrLn $ printProgram y
-                      putStrLn "==="
+--                 forM_ (zip [1::Int ..] tt) $ \(ii, x) -> forM_ (zip [1..] tt) $ \(jj, y) -> do
+--                   when (ii < jj) $ do
+--                     b <- x `equiv` y
+--                     when b $ do
+--                       putStrLn $ printProgram x
+--                       putStrLn $ printProgram y
+--                       putStrLn "==="
 
                 putStrLn "Trying to resolve..."
                 let res1  = [ (map (RichBV.eval p) xs, Endo (merger p)) | p <- ss] 
