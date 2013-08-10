@@ -39,33 +39,46 @@ solveAndAnswer tid size ops = do
       return Nothing
 
 main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >>= \case
-    ("training" : level : _) -> do
-        TrainingProblem prog ident size ops <- train $ TrainRequest (read level) []
-        putStrLn $ "Expected answer: " ++ T.unpack prog
-        rr <- solveAndAnswer ident size ops
+  ("training" : level : _) -> do
+    TrainingProblem prog ident size ops <- train $ TrainRequest (read level) []
+    putStrLn $ "Expected answer: " ++ T.unpack prog
+    rr <- solveAndAnswer ident size ops
+    case rr of
+      Just (answer, res) -> do
+        putStrLn $ "My answer: " ++ answer
+        putStrLn $ "Result: " ++ show res
+      Nothing -> do
+        return ()
+
+  ("test" : level : ops) -> do
+    _ <- solve (read level) ops equiv
+    return ()
+
+  ("submit" : _) -> do
+    putStrLn "really? (y/n)"
+    l <- getLine
+    when (l /= "y") $ fail "bye!"
+
+    putStrLn "really, really? (y/n)"
+    l <- getLine
+    when (l /= "y") $ fail "bye!"
+
+    problems <- myproblems
+    forM_ (sortBy (compare `on` problemSize) problems) $ \p -> do
+      when (isSolved p /= Just True) $ do
+        putStrLn $ "trying to solve: " ++ T.unpack (problemId p) ++ " " ++ show (problemSize p) ++ " " ++ show (problemOperators p)
+        rr <- solveAndAnswer (problemId p) (problemSize p) (problemOperators p)
         case rr of
           Just (answer, res) -> do
             putStrLn $ "Your answer: " ++ answer
             putStrLn $ "Result: " ++ show res
           Nothing -> do
             return ()
-    ("submit" : _) -> do
-        problems <- myproblems
-        forM_ (sortBy (compare `on` problemSize) problems) $ \p -> do
-          when (isSolved p /= Just True) $ do
-            putStrLn $ "trying to solve: " ++ T.unpack (problemId p) ++ " " ++ show (problemSize p) ++ " " ++ show (problemOperators p)
-            rr <- solveAndAnswer (problemId p) (problemSize p) (problemOperators p)
-            case rr of
-              Just (answer, res) -> do
-                putStrLn $ "Your answer: " ++ answer
-                putStrLn $ "Result: " ++ show res
-              Nothing -> do
-                return ()
 
-    ("hoge" : _) -> do
-      progs <- solve 9 ["if0","not","shl1","shr16"] equiv
-      -- mapM_ (\p -> putStrLn $ printProgram p ++ " -> " ++ printProgram ((canonic.simplify.moveOp2P.moveIfP.simplify.canonic $ p))) progs
-      return ()
+  ("hoge" : _) -> do
+    progs <- solve 9 ["if0","not","shl1","shr16"] equiv
+    -- mapM_ (\p -> putStrLn $ printProgram p ++ " -> " ++ printProgram ((canonic.simplify.moveOp2P.moveIfP.simplify.canonic $ p))) progs
+    return ()
 
 -- programs :: IO [Program]
 -- programs = map read . lines <$> getContents

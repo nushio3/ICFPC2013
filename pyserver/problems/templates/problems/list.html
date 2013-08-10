@@ -2,7 +2,14 @@
 <head>
 </head>
 <body>
-<h2>Problems getting solved now</h2>
+<h2>Contents</h2>
+<div class="toc">
+<span><a href="#solving">{{ under_solve_problems|length }} Solving</a></span>
+<span><a href="#untouched">{{ untouched_problems|length }} Untouched</a></span>
+<span><a href="#solved">{{ solved_problems|length }} Solved</a></span>
+<span><a href="#dead">{{ dead_problems|length }} Dead</a></span>
+</div>
+<h2 id="solving">{{ under_solve_problems|length }} Problems getting solved now</h2>
 <table><tr><th>id</th><th>size</th><th>operators</th></tr>
 {% for p in under_solve_problems %}
 <tr>
@@ -16,7 +23,7 @@
 {% endfor %}
 </table>
 
-<h2>Problems left untouched</h2>
+<h2 id="untouched">{{ untouched_problems|length }} Problems left untouched</h2>
 <table><tr><th>id</th><th>size</th><th>operators</th></tr>
 {% for p in untouched_problems %}
 <tr>
@@ -30,7 +37,7 @@
 {% endfor %}
 </table>
 
-<h2>Solved problems</h2>
+<h2 id="solved">{{ solved_problems|length }} Solved problems</h2>
 <table><tr><th>id</th><th>size</th><th>operators</th></tr>
 {% for p in solved_problems %}
 <tr>
@@ -44,7 +51,7 @@
 {% endfor %}
 </table>
 
-<h2>Dead problems</h2>
+<h2 id="dead">{{ dead_problems|length }} Dead problems</h2>
 <table><tr><th>id</th><th>size</th><th>operators</th></tr>
 {% for p in dead_problems %}
 <tr>
