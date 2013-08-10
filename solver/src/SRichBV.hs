@@ -77,10 +77,10 @@ equiv prog1 prog2 = do
 
 equivNeq ::  Program -> Program -> IO (Maybe BitVector)
 equivNeq prog1 prog2 = do
-  resp <- prove $ do
-    x <- forall "inputVal"
-    return $ sExec prog1 x .== sExec prog2 x
-  if not $ "Falsifiable." `isInfixOf` show resp
+  resp <- sat $ do
+    x <- symbolic "inputVal"
+    return $ sExec prog1 x ./= sExec prog2 x
+  if not $ "Satisfiable." `isInfixOf` show resp
     then return Nothing
     else (do
       let atari = 

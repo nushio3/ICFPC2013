@@ -10,7 +10,7 @@ import Text.Printf
 import System.Environment
 import Data.List
 import Data.Function
-import SRichBV (equiv)
+import SRichBV
 import API
 import Data.Bits
 import Data.Word
@@ -35,9 +35,18 @@ niceSolve size ops equiv = do
 
   let go i = do
         let n = 256
-        vs <- replicateM n randomIO
-        let xs = take n $ [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ reverse ( zipWith f [0..] vs)
-            f x y = x .&. 0xff .|. y .&. complement 0xff
+        let gen 0 = return []
+            gen m = do
+                i <- randomRIO (0, length ps - 1)
+                j <- randomRIO (0, length ps - 1)
+                if (i /= j)
+                    then do
+                        equivNeq (ps !! i) (ps !! j) >>= \case
+                            Just v -> (v:) <$> gen (m - 1)
+                            Nothing -> gen (m - 1)
+                    else gen m
+        vs <- (++) <$> gen n <*> replicateM n randomIO
+        let xs = take n $ [0,1,2,3,4,5,15,16,17,65535,65536,65537] ++ vs
         let res0  = [ (map (RichBV.eval p) xs, Endo (p:)) | p <- ss]
             mm0 :: M.Map [Word64] (Endo [Program])
             mm0   = M.fromListWith mappend res0
@@ -53,13 +62,13 @@ niceSolve size ops equiv = do
                 putStrLn "Cannot divide groups"
                 putStrLn $ "Maximum group size: " ++ show (length tt)
 
-                forM_ (zip [1::Int ..] tt) $ \(ii, x) -> forM_ (zip [1..] tt) $ \(jj, y) -> do
-                  when (ii < jj) $ do
-                    b <- x `equiv` y
-                    when b $ do
-                      putStrLn $ printProgram x
-                      putStrLn $ printProgram y
-                      putStrLn "==="
+--                 forM_ (zip [1::Int ..] tt) $ \(ii, x) -> forM_ (zip [1..] tt) $ \(jj, y) -> do
+--                   when (ii < jj) $ do
+--                     b <- x `equiv` y
+--                     when b $ do
+--                       putStrLn $ printProgram x
+--                       putStrLn $ printProgram y
+--                       putStrLn "==="
 
                 putStrLn "Trying to resolve..."
                 let res1  = [ (map (RichBV.eval p) xs, Endo (merger p)) | p <- ss] 
