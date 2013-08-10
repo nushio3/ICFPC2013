@@ -92,6 +92,8 @@ executable test-equiv
     , safe
     , sbv == 2.10.*
 
+  buildable: False
+
 executable rich-main
   Hs-Source-Dirs: exe-src
   Ghc-Options: -Wall -O2
@@ -134,6 +136,23 @@ executable rich-main-old
     , containers
 
 
+  buildable: False
+
+executable smt-synth
+  Hs-Source-Dirs: exe-src
+  Ghc-Options: -Wall -O2
+  Main-Is: smt-synth.hs
+  Other-Modules: 
+                    
+  Build-Depends: 
+      base ==4.*
+    , sbv == 2.10.*
+    , reflection
+    , text
+    , random
+    , solver
+
+  buildable: True
 
 executable survey-gen
   Hs-Source-Dirs: exe-src
@@ -146,6 +165,8 @@ executable survey-gen
     , control-bool
     , solver
     , random
+
+  buildable: False
 
 executable survey-equiv
   Hs-Source-Dirs: exe-src
@@ -160,6 +181,7 @@ executable survey-equiv
     , sbv
     , random
 
+  buildable: False
 
 executable survey-gul
   Hs-Source-Dirs: exe-src
@@ -174,6 +196,7 @@ executable survey-gul
     , time
     , random
 
+  buildable: False
 
 executable survey-expr
   Hs-Source-Dirs: exe-src
@@ -189,6 +212,7 @@ executable survey-expr
     , lens
 
 
+
 executable compare-gen
   Hs-Source-Dirs: exe-src
   Ghc-Options: -Wall -O2
@@ -200,3 +224,6 @@ executable compare-gen
     , control-bool
     , solver
     , random
+
+  buildable: False
+
