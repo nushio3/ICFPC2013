@@ -47,6 +47,7 @@ library
     , reflection
     , http-conduit
     , mtl
+    , logict
   Ghc-Options: -Wall -O2
 
 Test-Suite spec
