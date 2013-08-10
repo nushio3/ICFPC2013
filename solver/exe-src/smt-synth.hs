@@ -8,6 +8,7 @@ import qualified Data.Text as T
 import Text.Printf
 import System.Environment
 import Data.Maybe
+import Control.Applicative
 
 import API
 
@@ -90,12 +91,12 @@ type Operator2 = SWord64 -> SWord64 -> SWord64
 type Operator3 = SWord64 -> SWord64 -> SWord64 -> SWord64
 
 behave :: Int
-          -> [Operator1]
-          -> [Operator2]
-          -> [Operator3]
+          -> [T.Text] -> [Operator1]
+          -> [T.Text] -> [Operator2]
+          -> [T.Text] -> [Operator3]
           -> [(Word64, Word64)]
           -> IO [Word8]
-behave size op1s op2s op3s samples = do
+behave size name1s op1s name2s op2s name3s op3s samples = do
   let total = length op1s + length op2s + length op3s
       opmax = size - 1
       progsize = total * opmax
@@ -105,57 +106,81 @@ behave size op1s op2s op3s samples = do
       prog3 = concatMap (replicate opmax) op3s
 
   let pp = do
-        vars <- sWord64s ["var-" ++ show i | i <- [0..progsize+3-1] ]
-        let var ix = select vars 0 (ix :: SInt16)
-
-        constrain $ (vars !! 0) .== 0
-        constrain $ (vars !! 1) .== 1
-
-        args1 <- forM [0..length op1s*opmax-1] $ \i ->
+        args1 <- forM [0..length prog1-1] $ \i ->
           sInt16s [ "arg1-" ++ show i ++ "-" ++ show j | j <- [0..0] ]
-        args2 <- forM [0..length op2s*opmax-1] $ \i ->
+        args2 <- forM [0..length prog2-1] $ \i ->
           sInt16s [ "arg2-" ++ show i ++ "-" ++ show j | j <- [0..1] ]
-        args3 <- forM [0..length op3s*opmax-1] $ \i ->
+        args3 <- forM [0..length prog3-1] $ \i ->
           sInt16s [ "arg3-" ++ show i ++ "-" ++ show j | j <- [0..2] ]
 
         let allArgs = args1 ++ args2 ++ args3
 
-        perm <- sInt16s $ [ "line-" ++ show i | i <- [0..progsize-1] ]
+        l <- sInt16s $ [ "line-" ++ show i | i <- [0..progsize-1] ]
         result <- sInt16 "result"
-        constrain $ inRange result (0, literal $ fromIntegral $ length vars-1)
+        constrain $ inRange result (0, literal $ fromIntegral $ progsize + 3 - 1)
 
-        -- constraints for perm
-        constrain $ bAll (\ln -> 3 .<= ln &&& ln .< literal (fromIntegral $ progsize + 3)) perm
-        constrain $ allDifferent perm
+        -- constraints for l
+        constrain $ bAll (\ln -> inRange ln (3, literal (fromIntegral $ progsize + 3 - 1))) l
+        constrain $ allDifferent l
 
         -- constraints for argix
-        forM_ (zip perm allArgs) $ \(lineno, arg) -> do
-          forM_ arg $ \a -> constrain $ 0 .<= a &&& a .< lineno
+        forM_ (zip l allArgs) $ \(lineno, arg) -> do
+          forM_ arg $ \a -> constrain $ inRange a (0, lineno - 1)
 
         -- let go (x:xs@(_:_)) = (x .<= 2 ||| bAll (x ./=) xs) &&& go xs
         --     go _ = true
         -- constrain $ go $ concat allArgs
 
-        -- constraints for operation
-        constrain
-          $ bAll (\(v,opr,[a1]) -> v .== opr (var a1))
-          $ zip3 (drop 2 vars) prog1 args1
-        constrain
-          $ bAll (\(v,opr,[a1,a2]) -> v .== opr (var a1) (var a2))
-          $ zip3 (drop (2+length prog1) vars) prog2 args2
-        constrain
-          $ bAll (\(v,opr,[a1,a2,a3]) -> v .== opr (var a1) (var a2) (var a3))
-          $ zip3 (drop (2+length prog1+length prog2) vars) prog3 args3
+        -- constrain for examples
+        forM_ (zip [1..] samples) $ \(ii, (i, o)) -> do
+          vars <- sWord64s ["var-" ++ show ii ++ "-" ++ show i | i <- [0..progsize+3-1] ]
+          let var ix = select vars 0 (ix :: SInt16)
 
-        forM_ samples $ \(i, o) -> constrain $
-          (var 2 .== literal i) ==> (var result .== literal o)
+          constrain $ (vars !! 0) .== 0
+          constrain $ (vars !! 1) .== 1
+          constrain $ (vars !! 2) .== literal i
+          constrain $ var result  .== literal o
+
+          -- constraints for operation
+          constrain
+            $ bAll (\(v,opr,[a1]) -> v .== opr (var a1))
+            $ zip3 (drop 3 vars) prog1 args1
+          constrain
+            $ bAll (\(v,opr,[a1,a2]) -> v .== opr (var a1) (var a2))
+            $ zip3 (drop (3+length prog1) vars) prog2 args2
+          constrain
+            $ bAll (\(v,opr,[a1,a2,a3]) -> v .== opr (var a1) (var a2) (var a3))
+            $ zip3 (drop (3+length prog1+length prog2) vars) prog3 args3
 
         return (true :: SBool)
 
   generateSMTBenchmarks True "test" pp
-
   res <- sat pp
-  print res
+
+  let ss = [ (name, val) | (name: "=": val: _) <- map words $ lines $ show res ]
+  print ss
+
+  forM_ (zip [0..] $ concatMap (replicate opmax) name1s) $ \(i, name) -> do
+    printf "v%s = %s v%s\n"
+      (fromJust $ lookup (printf "line-%d" (i :: Int)) ss)
+      (T.unpack name)
+      (fromJust $ lookup (printf "arg1-%d-0" i) ss)
+  forM_ (zip [0..] $ concatMap (replicate opmax) name2s) $ \(i, name) -> do
+    printf "v%s = %s v%s v%s\n"
+      (fromJust $ lookup (printf "line-%d" (length name1s + i :: Int)) ss)
+      (T.unpack name)
+      (fromJust $ lookup (printf "arg2-%d-0" i) ss)
+      (fromJust $ lookup (printf "arg2-%d-1" i) ss)
+  forM_ (zip [0..] $ concatMap (replicate opmax) name3s) $ \(i, name) -> do
+    printf "v%s = %s v%s v%s v%3\n"
+      (fromJust $ lookup (printf "line-%d" (length name1s + length name2s + i :: Int)) ss)
+      (T.unpack name)
+      (fromJust $ lookup (printf "arg3-%d-0" i) ss)
+      (fromJust $ lookup (printf "arg3-%d-1" i) ss)
+      (fromJust $ lookup (printf "arg3-%d-2" i) ss)
+
+  printf "ret = v%s\n" $ fromJust $ lookup "result" ss
+
   undefined
 
 distinct :: Int -> Int -> [(Word64, Word64)] -> [Word8] -> IO (Maybe Word64)
@@ -184,7 +209,8 @@ synth :: Given Token => Int -> [T.Text] -> T.Text -> IO ()
 synth size ops ident = do
   putStrLn $ "Start synthesis: " ++ show size ++ ", " ++ show ops
 
-  is <- replicateM 256 randomIO
+  let initNum = 4
+  is <- zipWith (\i v -> v `div` initNum * initNum + i) [0..] <$> replicateM (fromIntegral initNum) randomIO
   os <- oracleIO ident is
 
   let op1s = catMaybes $ map toOp1 ops
@@ -193,7 +219,7 @@ synth size ops ident = do
 
   let go e = do
         putStrLn "behave..."
-        l <- behave size op1s op2s op3s e
+        l <- behave size (filter (isJust.toOp1) ops) op1s (filter (isJust.toOp2) ops) op2s (filter (isJust.toOp3) ops) op3s e
         putStrLn $ "found: " ++ show l
         a <- distinct size 14 e l
         putStrLn $ "distinct: " ++ show a
