@@ -28,28 +28,41 @@ data Environment = Environment
 satLambda :: API.Problem -> Map.Map BitVector (Float, BitVector) -> IO (Maybe String)
 satLambda = undefined
 
-verifyLambda :: Given Environment => Program -> IO Bool
-verifyLambda prog = do
+findCounterExamples :: Given Environment => Program -> IO [BitVector]
+findCounterExamples prog = do
     es <- atomically (readTVar (examples given))
-    case [i | (i, (p, o)) <- Map.toList es, eval prog i /= o ] :: [BitVector] of
-        [] -> return True
-        cs -> do
-            atomically $ modifyTVar (examples given) $ flip (foldr (\i -> ix i . _1 +~ 1)) cs
-            return False
+    return $ [i | (i, (p, o)) <- Map.toList es, eval prog i /= o ]
 
 genLambda :: Given Environment => IO ()
 genLambda = atomically (readTVar (examples given)) >>= satLambda (theProblem given) >>= \case
     Just p -> do
         let prog = enrichProgram $ readProgram p
-        b <- verifyLambda prog
-        when b $ do
-            m <- atomically $ readTVar (guessCandidate given)
-            if any (unsafePerformIO . equiv prog)
-                $ map (enrichProgram . readProgram) $ Map.keys m
-                then return ()
-                else do
-                    atomically $ writeTVar (guessCandidate given) $ at p ?~ 1 $ m 
+        findCounterExamples prog >>= \case
+            [] -> do
+                m <- atomically $ readTVar (guessCandidate given)
+                if any (unsafePerformIO . equiv prog)
+                    $ map (enrichProgram . readProgram) $ Map.keys m
+                    then return ()
+                    else do
+                        atomically $ writeTVar (guessCandidate given) $ at p ?~ 1 $ m 
+            cs -> do
+                atomically $ modifyTVar (examples given) $ flip (foldr (\i -> ix i . _1 +~ 1)) cs
     Nothing -> return ()
+
+judgement :: Given Environment => IO ()
+judgement = do
+    gcs <- readTVarIO (guessCandidate given)
+    
+    gcs' <- fmap (Map.fromAscList . concat) $ forM (Map.toAscList gcs) $ \(p, f) -> do
+        findCounterExamples (enrichProgram $ readProgram p) >>= \case
+            [] -> return [(p, f)]
+            cs -> return []
+    atomically $ writeTVar (guessCandidate given) gcs'
+
+removeTrivial :: Given Environment => IO ()
+removeTrivial = do
+    es <- readTVarIO (examples given)
+    forM_ (Map.keys es) $ \i -> atomically $ modifyTVar (evalCandidate given) (at i .~ Nothing)
 
 revealDistinguisher :: Given Environment => IO ()
 revealDistinguisher = do
