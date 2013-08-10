@@ -5,6 +5,7 @@ module Main where
 import Control.Lens
 import Control.Monad
 import Data.List
+import Data.Maybe
 import Data.SBV
 import qualified Data.Set as Set
 
@@ -13,6 +14,13 @@ import RichBV
 import SRichBV (sEvalE)
 import Text.Printf
 import System.IO.Unsafe
+
+newtype O = O { unO :: Expression}
+
+instance Eq O where
+  (O a) == (O b) = unsafePerformIO $ equivE a b
+instance Ord O where
+  O a `compare` O b = fromJust $ unsafePerformIO $ ordE a b
 
 equivE :: Expression -> Expression -> IO Bool
 equivE e1 e2 = do
@@ -53,18 +61,21 @@ ordE p1 p2  = do
 
 allOps = [If0 , TFold , Fold0 , Not , Shl 1 , Shr 1 , Shr 4 , Shr 16 , And , Or , Xor , Plus]
 
-someOps = [ If0 , Shl 1 , Shr 1 , And , Or ]
+someOps = [ If0 , Shl 1 , Shr 1 , And , Or ,Xor]
 
 main :: IO ()
 main = do
-  let exprs = map (^. _3) $ genExpression 5 someOps someOps 1
+  let exprs = map (^. _3) $ genExpression 6 someOps someOps 1
       simpExprs = Set.toList $ Set.fromList $ 
         map simplifyE exprs  
-      nubExprs = nubBy (\x y -> unsafePerformIO $ equivE x y) simpExprs
-
-      
+--      nubExprs = nubBy (\x y -> unsafePerformIO $ equivE x y) simpExprs
+      nubExprs2 = 
+        map unO $
+        Set.toList $ Set.fromList $ 
+        map O $
+        simpExprs
   printf "#(expr) = %d\n" $ length exprs  
   printf "#(expr) = %d\n" $ length simpExprs
-  printf "#(expr) = %d\n" $ length nubExprs
+  printf "#(expr) = %d\n" $ length nubExprs2
   return ()
   
