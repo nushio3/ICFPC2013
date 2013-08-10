@@ -33,8 +33,9 @@ post p body = withSocketsDo $ withManager f where
     let code = statusCode $ responseStatus res
     if code == 429
       then do
-        liftIO $ putStrLn "retrying..."
-        f man -- too many request, retry
+        -- too many request, retry
+        liftIO $ putStrLn "429 retrying..."
+        f man
       else if code >= 400 && code < 500
         then fail $ "HTTP Error " ++ show (responseStatus res) -- other response
         else maybe (fail "JSON decoding error") return . JSON.decode . responseBody $ res
