@@ -1,4 +1,4 @@
-module Gulwani where
+module Gulwani2 where
 import Data.Bits
 import Control.Monad
 import Text.Printf
