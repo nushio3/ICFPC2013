@@ -20,7 +20,7 @@ niceGenExpression :: Int -> [Op] -> Int -> StateT (Database, Set.Set Op) [] Expr
 niceGenExpression size ops vars = use _2 >>= \unused -> if
     | size == 1 && Set.null unused -> lift $ [Constant 0, Constant 1] ++ map Var [0..vars-1]
     | size >= 2 -> preuse (_1 . ix (size, ops, Set.toAscList unused, vars)) >>= \case
-            Just r | False -> lift $ Control.Lens.toListOf folded r
+            Just r -> lift $ Control.Lens.toListOf folded r
             _ -> do
                 e <- op1 <|> op2 <|> ifs <|> folds
                 preuse (_1 . ix (size, ops, Set.toAscList unused, vars)) >>= \case
