@@ -8,9 +8,6 @@ import time
 
 # Create your views here.
 
-def byId(p):
-    return p['id']
-
 def bySize(p):
     return (p['size'], len(p['operators']), ','.join(p['operators']), p['id'])
 
@@ -29,11 +26,34 @@ def isDead(p):
 def isUntouched(p):
     return not isSolved(p) and getTimeLeft(p) == 300
 
+def DoesIncludeAndExclude(baseline, include_list, exclude_list):
+    if not baseline.issuperset(include_list):
+        print 'notinc', baseline, include_list
+        return False
+    if baseline.intersection(exclude_list):
+        print 'notexc', baseline, include_list
+        return False
+    return True
+
+
 def index(request):
     all_problems = problems.models.loadModel()
-    key = request.GET.get('key', 'size')
-    key_list = {'id': byId, 'size': bySize}
-    all_problems.sort(key=key_list[key])
+    include_word = request.GET.get('with', '')
+    exclude_word = request.GET.get('without', '')
+    if include_word:
+        include_filter = set(include_word.split(' '))
+    else:
+        include_filter = set()
+    if exclude_word:
+        exclude_filter = set(exclude_word.split(' '))
+    else:
+        exclude_filter = set()
+
+    all_problems = filter(
+        lambda p: DoesIncludeAndExclude(set(p['operators']),
+                                        include_filter, exclude_filter),
+        all_problems)
+    all_problems.sort(key=bySize)
 
     under_solve_problems = filter(lambda p: isUnderSolve(p), all_problems)
     solved_problems = filter(lambda p: isSolved(p), all_problems)
@@ -49,7 +69,9 @@ def index(request):
         'dead_problems': dead_problems,
         'untouched_problems': untouched_problems,
         'last_modified': last_modified_string,
-        'autoload_status': autoload_status
+        'autoload_status': autoload_status,
+        'with': include_word,
+        'without': exclude_word
         }
     return render(request, 'problems/list.html', context)
 
