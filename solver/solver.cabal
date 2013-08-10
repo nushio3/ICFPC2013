@@ -110,6 +110,7 @@ executable rich-main
     , sbv == 2.10.*
     , reflection
     , text
+    , containers
 
 
 executable survey-gen
