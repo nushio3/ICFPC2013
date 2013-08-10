@@ -25,7 +25,7 @@ library
     API
     Database
 
-    Gulwani4
+    Gulwani2
 
 
   hs-source-dirs:    src/  
@@ -114,6 +114,7 @@ executable rich-main
     , text
     , containers
 
+  buildable: False
 
 executable rich-main-old
   Hs-Source-Dirs: exe-src
@@ -134,7 +135,6 @@ executable rich-main-old
     , reflection
     , text
     , containers
-
 
   buildable: False
 
@@ -211,19 +211,4 @@ executable survey-expr
     , containers
     , lens
 
-
-
-executable compare-gen
-  Hs-Source-Dirs: exe-src
-  Ghc-Options: -Wall -O2
-  Main-Is: compare-gen.hs
-  Other-Modules: 
-                    
-  Build-Depends: 
-      base ==4.*
-    , control-bool
-    , solver
-    , random
-
   buildable: False
-
