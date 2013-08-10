@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 module Main where
 
 import Control.Lens
@@ -7,6 +8,7 @@ import Data.List
 import Data.SBV
 import qualified Data.Set as Set
 
+import BV(BitVector)
 import RichBV
 import SRichBV (sEvalE)
 import Text.Printf
@@ -19,14 +21,14 @@ equivE e1 e2 = do
 
 ordE :: Expression -> Expression ->  IO (Maybe Ordering)
 ordE p1 p2  = do
-  p1 `equiv` p2 >>= \case 
+  p1 `equivE` p2 >>= \case 
     True -> return $ Just EQ
     False -> search minBound maxBound
 
   
   where
     search a b
-      | a+1 == b = return $ Just $ eval p1 b `compare` eval p2 b
+      | a+1 == b = return $ Just $ evalE  p1 [b] `compare` evalE  p2 [b]
       | otherwise = do
           let c = div (a+1) 2 + div b 2 
           go c >>= \case
@@ -37,7 +39,7 @@ ordE p1 p2  = do
     go :: BitVector -> IO (Maybe Bool)
     go n = do
       resp <- prove $ \n' -> 
-         (n' .< fromIntegral n) ==> sEvalE p1 n' .== sEvalE p2 n'
+         (n' .< fromIntegral n) ==> sEvalE p1 [n']  .== sEvalE p2 [n']
       if 
         | "Q.E.D." `isInfixOf` show resp       -> return $Just True
         | "Falsifiable." `isInfixOf` show resp -> return $Just True
@@ -58,7 +60,7 @@ main = do
   let exprs = map (^. _3) $ genExpression 5 someOps someOps 1
       simpExprs = Set.toList $ Set.fromList $ 
         map simplifyE exprs  
-      nubExprs = nubBy (unsafePerformIO. equivE) simpExprs
+      nubExprs = nubBy (\x y -> unsafePerformIO $ equivE x y) simpExprs
 
       
   printf "#(expr) = %d\n" $ length exprs  
