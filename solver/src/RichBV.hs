@@ -63,36 +63,18 @@ solve size ops equiv = do
         let res0  = [ (map (eval p) xs, Endo (p:)) | p <- ss]
             mm0 :: M.Map [Word64] (Endo [Program])
             mm0   = M.fromListWith mappend res0
-            freq0 = maximum $ map (length . retract) $ M.elems mm0
-            
-        let res1  = [ (map (eval p) xs, Endo (merger p)) | p <- ss] 
-            mm1 :: M.Map [Word64] (Endo [Program])
-            mm1   = M.fromListWith mappend res1
-            
-            merger :: Program -> [Program] -> [Program]
-            merger x xs 
-              | any (unsafePerformIO . equiv x) xs = xs
-              | otherwise        = x:xs
-        let
-            mm :: M.Map [Word64] (Endo [Program])
-            mm   
-              | freq0 <= mismatchTolerance = mm0
-              | otherwise                  = mm1
-            freq = maximum $ map (length . retract) $ M.elems mm
-              
-        
-        if freq <= mismatchTolerance
+            freq0 = maximum $ map (length . retract) $ M.elems mm0            
+
+        if freq0 <= mismatchTolerance
           then do
-            --let tt = map (retract . snd) $ reverse $ sortBy (compare `on` (length . retract . snd)) $ M.toList mm
-            --mapM_ (print . map printProgram) tt
-            return $ Just $ Context (\vss -> [ printProgram $ ms M.! cand | cand <- retract $ mm M.! vss]) xs
+            return $ Just $ Context (\vss -> [ printProgram $ ms M.! cand | cand <- retract $ mm0 M.! vss]) xs
           else do
             if i > retryTimes
               then do
-                let tt = retract $ snd $ head $ reverse $ sortBy (compare `on` (length . retract . snd)) $ M.toList mm
+                let tt = retract $ snd $ head $ reverse $ sortBy (compare `on` (length . retract . snd)) $ M.toList mm0
                 putStrLn "Cannot divide groups"
                 putStrLn $ "Maximum group size: " ++ show (length tt)
-                {-
+
                 forM_ (zip [1::Int ..] tt) $ \(ii, x) -> forM_ (zip [1..] tt) $ \(jj, y) -> do
                   when (ii < jj) $ do
                     b <- x `equiv` y
@@ -100,8 +82,21 @@ solve size ops equiv = do
                       putStrLn $ printProgram x
                       putStrLn $ printProgram y
                       putStrLn "==="
-                -}
-                return Nothing
+
+                putStrLn "Trying to resolve..."
+                let res1  = [ (map (eval p) xs, Endo (merger p)) | p <- ss] 
+                    mm1 :: M.Map [Word64] (Endo [Program])
+                    mm1   = M.fromListWith mappend res1
+                    
+                    merger :: Program -> [Program] -> [Program]
+                    merger x xs 
+                      | any (unsafePerformIO . equiv x) xs = xs
+                      | otherwise        = x:xs
+
+                    freq1 = maximum $ map (length . retract) $ M.elems mm1
+                if freq1 < mismatchTolerance
+                  then return $ Just $ Context (\vss -> [ printProgram $ ms M.! cand | cand <- retract $ mm1 M.! vss]) xs
+                  else return Nothing
               else go (i + 1)
 
   go 0 :: IO (Maybe (Context [Word64] [Word64] [String]))
