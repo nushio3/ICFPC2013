@@ -2,6 +2,30 @@
 <head>
 </head>
 <body>
+<h1>Problems</h1>
+<span>Last modified: {{ last_modified }}</span>
+<div>
+  <span>autoload: {{ autoload_status }}</span>
+  <span>
+    <form action="{% url 'problems:reload' %}" method="post">
+      {% csrf_token %}
+      <input type="submit" value="Reload Now" />
+    </form>
+  </span>
+  <span>
+    {% if autoload_status %}
+    <form action="{% url 'problems:setreload' False %}" method="post">
+      {% csrf_token %}
+      <input type="submit" value="Set autoload Off" />
+    </form>
+    {% else %}
+    <form action="{% url 'problems:setreload' True %}" method="post">
+      {% csrf_token %}
+      <input type="submit" value="Set autoload On" />
+    </form>
+    {% endif %}
+  </span>
+</div>
 <h2>Contents</h2>
 <div class="toc">
 <span><a href="#solving">{{ under_solve_problems|length }} Solving</a></span>
