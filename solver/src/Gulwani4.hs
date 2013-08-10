@@ -36,9 +36,15 @@ $(makeLenses ''Opaddr)
 testProg :: Symbolic LProgram
 testProg = do
   ret <- symbolic "returnAddr"
-  a <- symbolicOp 0 Plus 2
+  a <- symbolicOp 0 Var 0
   b <- symbolicOp 1 Plus 2
-  return (ret, [a,b])
+  c <- symbolicOp 2 Plus 2
+  return (ret, [a,b,c])
+
+
+test a b = do
+  prog <- testProg
+  phiFunc prog a b
 
 
 phiFunc :: LProgram -> Val -> Val -> Symbolic SBool
@@ -92,7 +98,7 @@ phiFunc (retAddr, library) alpha beta = do
   return $ 
     bAnd (map (phiAddrBound . fst) allAVs) &&&
     bAnd [(outAddrs!!i)./= (outAddrs!!j) 
-         | i <- [0..n-1], j <- [i+1..n]] &&& -- consistency
+         | i <- [0..n-1], j <- [i+1..n-1]] &&& -- consistency
     bAll phiAcyc library &&&
     bAnd (map phiLib varLib) &&&
     bAnd [ phiConn (allAVs!!i) (allAVs!!j) 
