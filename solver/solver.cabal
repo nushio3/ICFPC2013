@@ -116,7 +116,7 @@ executable rich-main
 executable rich-main-old
   Hs-Source-Dirs: exe-src
   Ghc-Options: -Wall -O2
-  Main-Is: rich-main.hs
+  Main-Is: rich-main-old.hs
   Other-Modules: 
                     
   Build-Depends: 
