@@ -109,14 +109,27 @@ executable rich-main
     , text
 
 
-executable servey-gen
+executable survey-gen
   Hs-Source-Dirs: exe-src
   Ghc-Options: -Wall -O2
-  Main-Is: servey-gen.hs
+  Main-Is: survey-gen.hs
   Other-Modules: 
                     
   Build-Depends: 
       base ==4.*
     , control-bool
     , solver
+    , random
+
+executable survey-equiv
+  Hs-Source-Dirs: exe-src
+  Ghc-Options: -Wall -O2
+  Main-Is: survey-equiv.hs
+  Other-Modules: 
+                    
+  Build-Depends: 
+      base ==4.*
+    , control-bool
+    , solver
+    , sbv
     , random
