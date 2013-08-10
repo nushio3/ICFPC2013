@@ -187,3 +187,16 @@ executable survey-expr
     , sbv
     , containers
     , lens
+
+
+executable compare-gen
+  Hs-Source-Dirs: exe-src
+  Ghc-Options: -Wall -O2
+  Main-Is: compare-gen.hs
+  Other-Modules: 
+                    
+  Build-Depends: 
+      base ==4.*
+    , control-bool
+    , solver
+    , random
