@@ -248,14 +248,15 @@ genProgram myFlags oprs size = do
   -- (if0 0 _) and (if0 1 _) is redundant
   opid If0 $ \i j k -> i ./= 0 &&& i ./= 1 &&& j .< k
 
-  -- (and 0 _) and (and _ 0)
-  opid And $ \i j k -> i ./= 0 &&& j ./= 0 &&& i .< j
+  -- (and 0 _) (and _ 0)
+  -- (and c c)
+  opid And $ \i j k -> i ./= 0 &&& j ./= 0 &&& (i .> 1 ||| j .> 1) &&& i .< j
 
   -- (or 0 _) and (or _ 0)
-  opid Or  $ \i j k -> i ./= 0 &&& j ./= 0 &&& i .< j
+  opid Or  $ \i j k -> i ./= 0 &&& j ./= 0 &&& (i .> 1 ||| j .> 1) &&& i .< j
 
   -- (xor 0 _) and (xor _ 0)
-  opid Xor $ \i j k -> i ./= 0 &&& j ./= 0 &&& i .< j
+  opid Xor $ \i j k -> i ./= 0 &&& j ./= 0 &&& (i .> 1 ||| j .> 1) &&& i .< j
 
   -- (plus 0 _) (plus _ 0) (plus i j) i >= j
   opid Plus $ \i j k -> i ./= 0 &&& j ./= 0 &&& i .<= j
