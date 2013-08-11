@@ -40,7 +40,10 @@ def main(argv):
         result = json.load(fin)
         fin.close()
     for i in xrange(flags.n):
-        result.append(GetTraining(flags.size))
+        try:
+            result.append(GetTraining(flags.size))
+        except urllib2.HTTPError, e:
+            sys.stderr.write('error: ' + str(e) + '\n')
         time.sleep(flags.sleep)
     sys.stdout.write(json.dumps(result))
 
