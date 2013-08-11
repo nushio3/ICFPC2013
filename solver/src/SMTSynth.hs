@@ -25,8 +25,20 @@ oracleIO ident inputs = do
   EvalResponse _estat (Just eout) _emsg <- API.eval $ EvalRequest (Just ident) Nothing $ map (T.pack . printf "0x%016X") inputs
   return eout
 
-oracleGuess :: GivenToke => Program -> IO Word8
+oracleGuess :: Given Token => Program -> IO Word8
 oracleGuess = undefined
+
+oracleDistinct :: Given Token => T.Text -> BV.Program -> IO (Word64, Word64)
+oracleDistinct ident p = do
+  GuessResponse gstat gval gmsg <- guess $ Guess ident (T.pack $ BV.printProgram p)
+  case gstat of
+    GuessWin      -> fail "yatapo-(^_^)"
+    GuessMismatch -> case gval of
+      Just [i, o, _myo] ->
+        return (read $ T.unpack i, read $ T.unpack o)
+      _ ->
+        fail "tsurapoyo('_`)"
+    GuessError -> fail $ show gmsg
 
 --valid :: [SWord8] -> SBool
 --valid oprs = go 0 oprs (0 :: SInt8) where
@@ -286,12 +298,16 @@ synth ss ops ident = do
         progn <- findProgram oprs size e
         putStrLn $ "found: " ++ show progn
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram oprs progn)
-        a <- distinct oprs size e progn
-        putStrLn $ "distinct: " ++ show a
-        case a of
-          Nothing -> putStrLn $ "Answer found!!: " ++ show progn
-          Just f -> do
-            [g] <- oracleIO ident [f]
-            go ((f, g):e)
+        (f, g) <- oracleDistinct ident $ toProgram oprs progn
+        putStrLn $ "distinct: " ++ show (f, g)
+        go ((f, g):e)
+
+        ---- a <- distinct oprs size e progn
+        --case a of
+        --  Nothing -> putStrLn $ "Answer found!!: " ++ show progn
+        --  Just f -> do
+        --    [g] <- oracleIO ident [f]
+        --    go ((f, g):e)
+
   go $ zip is os
   undefined
