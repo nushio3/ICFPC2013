@@ -37,6 +37,7 @@ library
     , containers == 0.5.*
     , lens ==3.9.*
     , lens-aeson
+    , MissingH
     , random
     , safe
     , sbv == 2.10.*

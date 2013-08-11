@@ -1,17 +1,25 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Gulwani4 where
 
+import qualified API
 import Control.Applicative hiding (Const)
 import Control.Lens hiding ((.>))
 import Control.Lens.TH
 import Control.Monad
 import Data.Bits
 import Data.Char
+import qualified Data.String.Utils as Str
+import Data.List (isInfixOf, isPrefixOf)
+import qualified Data.Map as Map
 import Data.SBV
+import qualified Data.Vector as V
 import Text.Printf
 
-type Addr = SWord16
-type Val = SWord64
+import BV(BitVector)
+import SBV(SBitVector)
+
+type Addr = SWord8
+type Val = SBitVector
 
 data Op = Const Int | Var 
         | Not | Shl Int | Shr Int
@@ -19,6 +27,12 @@ data Op = Const Int | Var
         | If0 
                            deriving (Eq, Ord, Show, Read)
 
+data VarEdge 
+ = OutEdge String
+ | InEdge String Int
+    deriving (Eq, Ord, Show, Read)
+                                    
+                                    
 arity :: Op -> Int
 arity (Const _) = 0
 arity Var       = 0
@@ -97,14 +111,56 @@ progOfSize size0 opList0 = do
   
   return (thmWfp, LVProgram {-  ret -}  addrLib)
 
-testMain examples = do
-  (thmWfp, prog) <- progOfSize 2 [Plus]
+testMain = do
+  satLambda undefined $
+    Map.fromList 
+      [( 0 , (1.341, 1))
+      ,( 3 , (1.341, 6)) ]
+
+satLambda :: API.Problem -> Map.Map BitVector (Float, BitVector) -> IO (Maybe String)
+satLambda probSpec exampleMap = do
+  let 
+    examples :: [(SBitVector, SBitVector)]
+    examples = map (both %~ fromIntegral) $ 
+               map (_2 %~ snd)$ Map.toList exampleMap
+
+  ret <- sat $ do
+    (thmWfp, prog) <- progOfSize 1 [If0, Plus]
   
-  thmBehs <- (flip. flip zipWithM) [0..] examples $ \i (a,b) -> 
-    phiFunc prog i a b
-  return $ thmWfp &&& bAnd thmBehs
-
-
+    thmBehs <- (flip. flip zipWithM) [0..] examples $ \i (a,b) -> 
+      phiFunc prog i a b
+    return $ thmWfp &&& bAnd thmBehs
+  
+  case ("Satisfiable." `isPrefixOf` show ret) of
+    False -> return Nothing
+    True -> parseSBVOutput $ show ret
+    
+parseSBVOutput :: String -> IO (Maybe String)
+parseSBVOutput outputStr = do
+  mapM_ print $ Map.toList satMap
+  return ret
+  where
+    ret = Nothing
+    satMap :: Map.Map VarEdge Int
+    satMap = 
+      Map.fromList $
+      concat $
+      map findAddrLine $
+      filter ("::" `isInfixOf`)$
+      lines outputStr
+    findAddrLine :: String -> [(VarEdge, Int)]
+    findAddrLine str = case words str of
+      (key:_:val:_) | (take 3 key == "oa_")
+                      -> [(OutEdge (getRaw key), read val) ]
+      (key:_:val:_) | (take 3 key == "ia_")
+                      -> [(InEdge (getRaw key) (getArgIdx key), read val) ]
+                         
+                         
+      _               -> []
+      
+    getRaw key = Str.split "-" key !! 1
+    getArgIdx key = read $ Str.split "-" key !! 3
+    
 phiFunc :: LVProgram -> Int -> Val -> Val -> Symbolic SBool
 phiFunc lvProg exampleIdx alpha beta = do
   let n = length $ addrLib
