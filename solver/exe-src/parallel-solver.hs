@@ -26,9 +26,9 @@ import BV (BitVector)
 import qualified API
 import qualified Data.Map as Map
 import Network.HTTP.Conduit
-import qualified WrapSMTSynth
-import SMTSynth hiding (Program)
+import qualified RemoteSolver
 import Z3Slayer
+import SMTSynth hiding (Program)
 
 data Environment = Environment
     { examples :: TVar (Map.Map BitVector (Double, BitVector))
@@ -176,8 +176,8 @@ trainProblem level ops = do
     API.TrainingProblem prog ident size ops <- API.train $ API.TrainRequest level ops
     return (ident, size, map T.unpack ops)
 
-solveAndAnswer :: Given API.Token => T.Text -> Int -> [String] -> Double -> Double -> Double -> Double -> IO ()
-solveAndAnswer ident size ops w1 w2 w3 ratio = do
+solveAndAnswer :: Given API.Token => T.Text -> Int -> [String] -> Double -> Double -> IO ()
+solveAndAnswer ident size ops w ratio = do
     ves <- newTVarIO Map.empty
     vgs <- newTVarIO Map.empty
     vev <- newTVarIO $ Map.fromList $ zip [0,1,2,3,4,5,15,16,17,65535,65536,65537] (repeat 50)
@@ -193,25 +193,23 @@ solveAndAnswer ident size ops w1 w2 w3 ratio = do
             , startTime = t
             , theId = ident
             , strictness = ratio
-            , theSatLambdas = [WrapSMTSynth.satLambda flags size ops]
+            , theSatLambdas = [RemoteSolver.satLambdaRemote flags size ops]
             , _DEATH_NOTE = deathNote
             }
     print (size, ops)
     (give env :: (Given Environment => IO ()) => IO ()) $ do
-        replicateM_ 3 $ spawn w1
-        replicateM_ 3 $ spawn w2
-        replicateM_ 3 $ spawn w3
+        replicateM_ 8 $ spawn w
         oracleSummoner
 
 main = give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >>= \case
-    ("submit" : ident : w1 : w2 : w3 : ratio : _) -> do
+    ("submit" : ident : w : ratio : _) -> do
         problems <- API.myproblems
         case find (\p -> API.problemId p == T.pack ident) problems of
-            Just p -> solveAndAnswer (T.pack ident) (API.problemSize p) (map T.unpack $ API.problemOperators p) (read w1) (read w2) (read w3) (read ratio)
+            Just p -> solveAndAnswer (T.pack ident) (API.problemSize p) (map T.unpack $ API.problemOperators p) (read w) (read ratio)
             Nothing -> fail ""
-    (level : w1 : w2 : w3 : ratio : ops) -> do
+    (level : w : ratio : ops) -> do
         (ident, size, ops) <- trainProblem (read level) (map T.pack ops)
-        solveAndAnswer ident size ops (read w1) (read w2) (read w3) (read ratio)
+        solveAndAnswer ident size ops (read w) (read ratio)
 
 forkKillme :: Given Environment => IO () -> IO ThreadId
 forkKillme m = do

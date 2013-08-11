@@ -3,7 +3,7 @@ module SMTSynth where
 
 import Data.SBV
 import System.Random
-import Control.Lens ((&), (^.), (.~))
+import Control.Lens ((&), (^.), (.~), (%~))
 import Control.Lens.TH
 import Control.Monad
 import Data.Reflection
@@ -16,6 +16,7 @@ import Data.List
 import Data.List.Split
 import Control.Concurrent.Async
 import System.Cmd
+import System.IO.Unsafe
 import Control.Monad.Trans
 
 import API
@@ -23,13 +24,14 @@ import qualified RichBV as BV
 
 data SpecialFlags = SpecialFlags
   { _bonusMode :: Bool
-  , _tfoldMode :: Bool }
+  , _tfoldMode :: Bool
+  , _randomSeed :: Int}
   deriving (Eq, Ord, Read, Show)  
 
 $(makeLenses ''SpecialFlags)
 
 defaultSpecialFlags :: SpecialFlags
-defaultSpecialFlags = SpecialFlags False False 
+defaultSpecialFlags = SpecialFlags False False $ unsafePerformIO $ randomRIO (0, 16383)
 
 -- TODO: support fold
 -- if0, not, shl1, shr1, shr4, shr16, and, or, xor, plus
@@ -227,15 +229,15 @@ genProgram myFlags oprs size = do
 --  generateSMTBenchmarks True "distinct" c
 --  return $ fmap read $ lookup "distinctInput" $ parseRes $ show res
 
-findProgram :: Int -> SpecialFlags -> [Opr] -> Int -> [(Word64, Word64)] -> IO Program
-findProgram seed myFlags oprs size samples = do
+findProgram :: SpecialFlags -> [Opr] -> Int -> [(Word64, Word64)] -> IO Program
+findProgram myFlags oprs size samples = do
   let c = do
         (opcs, argss) <- genProgram myFlags oprs size
         forM_ samples $ \(i, o) ->
           behave myFlags oprs size opcs argss (literal i) (literal o)
         return (true :: SBool)
   -- generateSMTBenchmarks True "find" c
-  res <- satWith (z3 {solver=(solver z3) {options=options (solver z3) ++ ["smt.random_seed="++show seed]}}) c
+  res <- satWith (z3 {solver=(solver z3) {options=options (solver z3) ++ ["smt.random_seed="++show (myFlags ^. randomSeed)]}}) c
   
   -- print res
   return $ parseProgram (myFlags^.tfoldMode) $ show res
@@ -326,7 +328,7 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
   let go es = do
         -- putStrLn "behave..."
         putStrLn $ "inputs: " ++ show es
-        progn <- para cpuNum $ \i -> findProgram ((abs $ seeds !! i)`mod`65536) myFlags oprs (size + i `mod` 3) $ take 5 es
+        progn <- para cpuNum $ \i -> findProgram (myFlags&randomSeed.~((abs $ (seeds::[Int]) !! i)`mod`65536)) oprs (size + i `mod` 3) $ take 5 es
         system "pkill z3"
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram myFlags oprs progn)
         o <- oracleDistinct ident $ toProgram myFlags oprs progn
