@@ -57,6 +57,8 @@ genLambda t = do
                         then return ()
                         else do
                             atomically $ writeTVar (guessCandidate given) $ at p ?~ 1 $ m 
+                            forkKillme revealDistinguisher
+                            return ()
                 cs -> do
                     atomically $ modifyTVar (examples given) $ flip (foldr (\i -> ix i . _1 +~ 2)) cs
         Nothing -> return ()
@@ -79,23 +81,24 @@ removeTrivial = do
 revealDistinguisher :: Given Environment => IO ()
 revealDistinguisher = do
     ps <- fmap Map.toList $ atomically $ readTVar $ guessCandidate given
-    i <- randomRIO (0, length ps - 1)
-    let go = do
-            j <- randomRIO (0, length ps - 1)
-            if i == j
-                then go
-                else return j
-    j <- go
-    let a = ps !! i
-        b = ps !! j
-    equivNeq (enrichProgram $ readProgram $ fst a) (enrichProgram $ readProgram $ fst b) >>= \case 
-        Just counter -> do
-            atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 70
-            atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 70
-        Nothing -> do
-            if snd a < snd b
-                then atomically $ modifyTVar' (guessCandidate given) $ at (fst a) .~ Nothing
-                else atomically $ modifyTVar' (guessCandidate given) $ at (fst b) .~ Nothing
+    when (length ps > 2) $ do
+        i <- randomRIO (0, length ps - 1)
+        let go = do
+                j <- randomRIO (0, length ps - 1)
+                if i == j
+                    then go
+                    else return j
+        j <- go
+        let a = ps !! i
+            b = ps !! j
+        equivNeq (enrichProgram $ readProgram $ fst a) (enrichProgram $ readProgram $ fst b) >>= \case 
+            Just counter -> do
+                atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 70
+                atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 70
+            Nothing -> do
+                if snd a < snd b
+                    then atomically $ modifyTVar' (guessCandidate given) $ at (fst a) .~ Nothing
+                    else atomically $ modifyTVar' (guessCandidate given) $ at (fst b) .~ Nothing
 
 remainingTime :: Given Environment => IO Double
 remainingTime = do
@@ -164,11 +167,6 @@ oracleSummoner = forever $ do
     atomically $ writeTVar (strictness given) (sqrt $ 1024 / fromIntegral (Map.size t))
     threadDelay $ 4 * 1000 * 1000
 
-trainer :: Given Environment => IO ()
-trainer = forever $ do
-    revealDistinguisher
-    threadDelay $ 5 * 1000 * 1000
-
 trainProblem :: Given API.Token => Int -> IO (T.Text, Int, [String])
 trainProblem level = do
     API.TrainingProblem prog ident size ops <- API.train $ API.TrainRequest level []
@@ -201,7 +199,6 @@ main = getArgs >>= \case
             replicateM_ 3 $ spawn (read w1)
             replicateM_ 3 $ spawn (read w2)
             replicateM_ 2 $ spawn (read w3)
-            forkKillme trainer
             oracleSummoner
 
 forkKillme :: Given Environment => IO () -> IO ThreadId
