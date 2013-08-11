@@ -138,24 +138,6 @@ executable rich-main-old
 
   buildable: False
 
-executable smt-synth
-  Hs-Source-Dirs: exe-src
-  Ghc-Options: -Wall -O2
-  Main-Is: smt-synth.hs
-  Other-Modules: 
-                    
-  Build-Depends: 
-      base ==4.*
-    , sbv == 2.10.*
-    , reflection
-    , text
-    , random
-    , solver
-    , mtl
-    , split
-
-  buildable: True
-
 executable survey-gen
   Hs-Source-Dirs: exe-src
   Ghc-Options: -Wall -O2
