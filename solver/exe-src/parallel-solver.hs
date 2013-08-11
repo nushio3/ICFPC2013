@@ -28,6 +28,7 @@ import qualified Data.Map as Map
 import Network.HTTP.Conduit
 import qualified WrapSMTSynth
 import SMTSynth hiding (Program)
+import Z3Slayer
 
 data Environment = Environment
     { examples :: TVar (Map.Map BitVector (Double, BitVector))
@@ -168,9 +169,9 @@ oracleSummoner = forever $ do
     printf "Examples: %d, Eval: %d, Guess: %d\n" (Map.size t) (Map.size u) (Map.size v)
     threadDelay $ 4 * 1000 * 1000
 
-trainProblem :: Given API.Token => Int -> IO (T.Text, Int, [String])
-trainProblem level = do
-    API.TrainingProblem prog ident size ops <- API.train $ API.TrainRequest level []
+trainProblem :: Given API.Token => Int -> [T.Text] -> IO (T.Text, Int, [String])
+trainProblem level ops = do
+    API.TrainingProblem prog ident size ops <- API.train $ API.TrainRequest level ops
     return (ident, size, map T.unpack ops)
 
 solveAndAnswer :: Given API.Token => T.Text -> Int -> [String] -> Double -> Double -> Double -> Double -> IO ()
@@ -206,8 +207,8 @@ main = give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getAr
         case find (\p -> API.problemId p == T.pack ident) problems of
             Just p -> solveAndAnswer (T.pack ident) (API.problemSize p) (map T.unpack $ API.problemOperators p) (read w1) (read w2) (read w3) (read ratio)
             Nothing -> fail ""
-    (level : w1 : w2 : w3 : ratio : _) -> do
-        (ident, size, ops) <- trainProblem (read level)
+    (level : w1 : w2 : w3 : ratio : ops) -> do
+        (ident, size, ops) <- trainProblem (read level) (map T.pack ops)
         solveAndAnswer ident size ops (read w1) (read w2) (read w3) (read ratio)
 
 forkKillme :: Given Environment => IO () -> IO ThreadId
@@ -229,12 +230,3 @@ spawn t = forkKillme $ forever $ do
             Nothing -> z3Slayer >> putStrLn "Spawning: Failed."
             Just _ -> putStrLn "Spawning: Done."
         else threadDelay $ 1 * 1000 * 1000
-
-z3Slayer = do
-    procs <- map words <$> lines <$> readProcess "/bin/ps" [] ""
-    forM_ (filter (elem "<defunct>") procs) $ \case
-      (pid:_) -> do
-	putStrLn $ "kill -9 " ++ pid
-	system $ "kill -9 " ++ pid
-        return ()
-      _ -> return ()
