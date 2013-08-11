@@ -25,7 +25,7 @@ oracleIO ident inputs = do
   EvalResponse _estat (Just eout) _emsg <- API.eval $ EvalRequest (Just ident) Nothing $ map (T.pack . printf "0x%016X") inputs
   return eout
 
-oracleGuess :: GivenToke => Program -> IO Word8
+oracleGuess :: Given Token => Program -> IO Word8
 oracleGuess = undefined
 
 --valid :: [SWord8] -> SBool
