@@ -34,7 +34,7 @@ data Environment = Environment
     , oracleCount :: TVar Int
     , startTime :: UTCTime
     , theId :: T.Text
-    , strictness :: TVar Double
+    , strictness :: Double
     , theSatLambdas :: [Double -> Map.Map BitVector (Double, BitVector) -> IO (Maybe String)]
     , _DEATH_NOTE :: TVar [ThreadId]
     }
@@ -46,7 +46,7 @@ findCounterExamples prog = do
 
 genLambda :: Given Environment => Double -> IO ()
 genLambda t = do
-    atomically (readTVar (examples given)) >>= head (theSatLambdas given) t >>= \case
+    atomically (readTVar (examples given)) >>= head (theSatLambdas given) (t * strictness given) >>= \case
         Just p -> do
             let prog = enrichProgram $ readProgram p
             findCounterExamples prog >>= \case
@@ -54,12 +54,14 @@ genLambda t = do
                     m <- atomically $ readTVar (guessCandidate given)
                     if any (unsafePerformIO . equiv prog)
                         $ map (enrichProgram . readProgram) $ Map.keys m
-                        then return ()
+                        then putStrLn "Bad:Equivalent"
                         else do
-                            atomically $ writeTVar (guessCandidate given) $ at p ?~ 1 $ m 
-                            forkKillme revealDistinguisher
+                            putStrLn "Good"
+                            atomically $ modifyTVar (guessCandidate given) $ at p ?~ 1
+                            revealDistinguisher
                             return ()
                 cs -> do
+                    putStrLn "Bad:CounterExample"
                     atomically $ modifyTVar (examples given) $ flip (foldr (\i -> ix i . _1 +~ 2)) cs
         Nothing -> return ()
 
@@ -124,8 +126,7 @@ manufactur = do
         | otherwise -> guess
     where
         eval = do
-            print "eval"
-            es' <- fmap (take 256 . sortBy (flip (compare `on` view _2)) . Map.toList)
+            es' <- fmap (take 128 . sortBy (flip (compare `on` view _2)) . Map.toList)
                 $ atomically $ readTVar (evalCandidate given)
             let es = map fst es'
             is <- (es++) <$> replicateM (256 - length es) randomIO
@@ -133,7 +134,6 @@ manufactur = do
             API.eval (API.EvalRequest (Just $ theId given) Nothing (map (T.pack . printf "0x%016X") is)) >>= \case
                 API.EvalResponse API.EvalOk (Just os) _ -> addExample $ zip3 is (replicate (length es) 70 ++ repeat 60) os
                 API.EvalResponse API.EvalError _ (Just msg) -> putStrLn (T.unpack msg)
-            putStrLn "eval: Done."
         guess = do
             putStrLn "guess"
             gsc <- atomically $ readTVar (guessCandidate given)
@@ -164,7 +164,6 @@ oracleSummoner = forever $ do
     u <- readTVarIO (evalCandidate given)
     v <- readTVarIO (guessCandidate given)
     printf "Examples: %d, Eval: %d, Guess: %d\n" (Map.size t) (Map.size u) (Map.size v)
-    atomically $ writeTVar (strictness given) (sqrt $ 1024 / fromIntegral (Map.size t))
     threadDelay $ 4 * 1000 * 1000
 
 trainProblem :: Given API.Token => Int -> IO (T.Text, Int, [String])
@@ -173,7 +172,7 @@ trainProblem level = do
     return (ident, size, map T.unpack ops)
 
 main = getArgs >>= \case
-    (level : w1 : w2 : w3 : _) -> give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ do
+    (level : w1 : w2 : w3 : ratio : _) -> give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ do
         (ident, size, ops) <- trainProblem (read level)
         ves <- newTVarIO Map.empty
         vgs <- newTVarIO Map.empty
@@ -181,7 +180,6 @@ main = getArgs >>= \case
         deathNote <- newTVarIO []
         oc <- newTVarIO 0
         t <- getCurrentTime
-        st <- newTVarIO 1.0
         let flags = defaultSpecialFlags & bonusMode .~ ("bonus" `elem` ops)
                 & tfoldMode .~ ("tfold" `elem` ops)
         let env = Environment { examples = ves
@@ -190,7 +188,7 @@ main = getArgs >>= \case
                 , oracleCount = oc
                 , startTime = t
                 , theId = ident
-                , strictness = st
+                , strictness = read ratio
                 , theSatLambdas = [WrapSMTSynth.satLambda flags size ops]
                 , _DEATH_NOTE = deathNote
                 }
@@ -198,7 +196,7 @@ main = getArgs >>= \case
         (give env :: (Given Environment => IO ()) => IO ()) $ do
             replicateM_ 3 $ spawn (read w1)
             replicateM_ 3 $ spawn (read w2)
-            replicateM_ 2 $ spawn (read w3)
+            replicateM_ 3 $ spawn (read w3)
             oracleSummoner
 
 forkKillme :: Given Environment => IO () -> IO ThreadId
@@ -214,10 +212,12 @@ kill'em_all = do
 
 spawn :: Given Environment => Double -> IO ThreadId
 spawn t = forkKillme $ forever $ do
-    putStrLn $ "Spawning: " ++ show t
-    timeout (floor $ t * 2 * 1000 * 1000) (genLambda t) >>= \case
-        Nothing -> z3Slayer >> putStrLn "Spawning: Failed."
-        Just _ -> putStrLn "Spawning: Done."
+    s <- readTVarIO (examples given)
+    if (Map.size s >= 256)
+        then timeout (floor $ t * 1000 * 1000) (genLambda t) >>= \case
+            Nothing -> z3Slayer >> putStrLn "Spawning: Failed."
+            Just _ -> putStrLn "Spawning: Done."
+        else threadDelay $ 1 * 1000 * 1000
 
 z3Slayer = do
     procs <- map words <$> lines <$> readProcess "/bin/ps" [] ""
