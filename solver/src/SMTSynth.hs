@@ -16,6 +16,7 @@ import Data.List
 import Data.List.Split
 import Control.Concurrent.Async
 import System.Cmd
+import Control.Monad.Trans
 
 import API
 import qualified RichBV as BV
@@ -204,28 +205,16 @@ behave myFlags oprs size opcs argss i o = do
 
   if not $ myFlags^.tfoldMode
     then do
-      vars <- sWord64s [ printf "var-%d" ln | ln <- [0::Int ..size+offs-1]]
-
-      constrain $ (vars !! 0) .== 0
-      constrain $ (vars !! 1) .== 1
-      constrain $ (vars !! 2) .== i
+      vars <- ([0,1,i]++) <$> sWord64s [ printf "var-%d" ln | ln <- [0::Int ..size-1]]
       constrain $ last vars   .== o
-
       forM_ (zip3 [offs..] (candss vars) opcs) $ \(ln, cands, opc) ->
         constrain $ vars !! ln .== select cands 0 opc
     else do
       let go [] acc = constrain $ acc .== o
           go (x:xs) acc = do
-            vars <- sWord64s [ printf "var-%d" ln | ln <- [0::Int ..size+offs-1]]
-
-            constrain $ (vars !! 0) .== 0
-            constrain $ (vars !! 1) .== 1
-            constrain $ (vars !! 2) .== x
-            constrain $ (vars !! 3) .== acc
-
+            vars <- ([0,1,x,acc]++) <$> sWord64s [ printf "var-%d" ln | ln <- [0::Int ..size-1]]
             forM_ (zip3 [offs..] (candss vars) opcs) $ \(ln, cands, opc) ->
               constrain $ vars !! ln .== select cands 0 opc
-
             go xs (last vars)
 
       go [ (i `shiftR` (8*s)) .&. 0xff | s <- [0..7]] 0
@@ -236,6 +225,12 @@ genProgram myFlags oprs size = do
 
   opcs <- sWord8s [ printf "opc-%d" i | i <- take size [offs ..] ]
   constrain $ bAll (`inRange` (0, fromIntegral $ length oprs-1)) opcs
+
+  let costs = map (literal . fromIntegral . argNum) oprs
+
+  b <- liftIO $ randomIO
+  when b $
+    constrain $ sum [ select costs (1 :: SInt8) opc | opc <- opcs ] - (literal $ fromIntegral $ length oprs) .<= (literal $ fromIntegral size)
 
   argss <- forM (take size [offs ..]) $ \ln -> do
     args <- sWord8s [ printf "arg-%d-%d" ln i | i <- [0::Int ..2] ]
@@ -405,19 +400,21 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
   putStrLn $ "Start synthesis: " ++ T.unpack ident ++ " " ++ show ss ++ " (" ++ show size ++ "), " ++ show ops
   when isTFold $ putStrLn "TFold Mode (>_<);;"
 
-  let go es add = do
+  let go es = do
         -- putStrLn "behave..."
-        putStrLn $ "inputs: " ++ show (add ++ es)
-        progn <- para cpuNum $ \i -> findProgram i myFlags oprs (size + i `mod` 4) $ add ++ es
+        putStrLn $ "inputs: " ++ show es
+        progn <- para cpuNum $ \i -> findProgram i myFlags oprs (size + i `mod` 4) $ take 5 es
         system "pkill z3"
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram myFlags oprs progn)
         o <- oracleDistinct ident $ toProgram myFlags oprs progn
         case o of
           Nothing -> do
             putStrLn "Accepted: yatapo-(^_^)!"
+            system "wget http://botis.org:9999/play/VEC1%20FX%20081.wav -O /dev/null"
+            return ()
           Just oo -> do
             putStrLn $ "distinct: " ++ show oo
-            go es (oo:add)
+            go (oo:es)
 
         ---- a <- distinct oprs size e progn
         --case a of
@@ -426,4 +423,4 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
         --    [g] <- oracleIO ident [f]
         --    go ((f, g):e)
 
-  go es []
+  go es

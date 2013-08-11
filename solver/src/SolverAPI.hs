@@ -40,12 +40,14 @@ satLambda (Input flags probsize ops weight examples) =
     toTuple :: InputExample -> (BitVector, (Double, BitVector))
     toTuple (InputExample i w o) = (i, (w, o))
 
+sampleInput :: Input
+sampleInput =
+  Input (SpecialFlags False False) 2 ["plus", "if0"] 60 [
+    InputExample 0 1.361 1,
+    InputExample 3 1.361 6
+    ]
 
 -- Outputs {"Flags":{"tfoldMode":false,"bonusMode":false},"Size":2,"Weight":60.0,"Operators":["plus","if0"],"Examples":[{"Weight":1.361,"Input":0,"Output":1},{"Weight":1.361,"Input":3,"Output":6}]}
 outputMain :: IO ()
 outputMain = do
-  let sample = Input (SpecialFlags False False) 2 ["plus", "if0"] 60 [
-        InputExample 0 1.361 1,
-        InputExample 3 1.361 6
-        ]
-  BL8.putStrLn $ JSON.encode sample
+  BL8.putStrLn $ JSON.encode sampleInput
