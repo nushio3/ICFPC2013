@@ -1,5 +1,4 @@
 {-# LANGUAGE LambdaCase, MultiWayIf, FlexibleContexts, ScopedTypeVariables, Rank2Types #-}
-import qualified Data.Vector as V
 import Data.Time
 import Data.Reflection
 import Control.Concurrent
@@ -25,7 +24,7 @@ import qualified API
 import qualified Data.Map as Map
 
 import qualified WrapSMTSynth
-type Candidate = V.Vector
+
 data Environment = Environment
     { examples :: TVar (Map.Map BitVector (Double, BitVector))
     , guessCandidate :: TVar (Map.Map String Double)
