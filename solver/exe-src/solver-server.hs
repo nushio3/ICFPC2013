@@ -37,6 +37,9 @@ main = runserver =<< cmdArgs server_options where
   runserver (ServerOptions port weight) = scotty port $ do
     middleware logStdoutDev
 
+    -- diagnose
+    get "/" $ text "foobar"
+
     post "/solve" $ do
       liftIO $ threadDelay (weight * 1000 * 1000)
       b <- body
