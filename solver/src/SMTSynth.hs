@@ -403,6 +403,7 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
         case o of
           Nothing -> do
             putStrLn "Accepted: yatapo-(^_^)!"
+            system "wget http://botis.org:9999/play/VEC1%20FX%20081.wav -O /dev/null"
           Just oo -> do
             putStrLn $ "distinct: " ++ show oo
             go (oo:es)
