@@ -15,10 +15,13 @@ import Data.Aeson.Types as JSON
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BL8
+import qualified Data.Map as Map
 import Control.Monad
 import Control.Monad.Trans
 import Network.HTTP.Types.Status
 
+import BV(BitVector)
+import SMTSynth
 import qualified SolverAPI
 
 satLambdaSingleRemote :: String -> SolverAPI.Input -> IO (Maybe String)
@@ -63,8 +66,8 @@ satLambdaRemoteUrls urls input = paraAny . map callone $ urls where
       Just a -> return (Just a)
 
 -- TODO: read from file.
-satLambdaRemote :: SolverAPI.Input -> IO (Maybe String)
-satLambdaRemote =
+satLambdaRemotePacked :: SolverAPI.Input -> IO (Maybe String)
+satLambdaRemotePacked =
   satLambdaRemoteUrls . map (\s->"http://" ++ s ++ ":31940/solve") $ [
     "ec2-54-213-134-138.us-west-2.compute.amazonaws.com",
     "ec2-54-213-128-103.us-west-2.compute.amazonaws.com",
@@ -73,6 +76,11 @@ satLambdaRemote =
     "ec2-54-213-132-147.us-west-2.compute.amazonaws.com",
     "ec2-54-213-134-50.us-west-2.compute.amazonaws.com"
     ]
+
+satLambdaRemote :: SpecialFlags -> Int -> [String] -> Double -> Map.Map BitVector (Double, BitVector)
+                   -> IO (Maybe String)
+satLambdaRemote flags size ops t example =
+  satLambdaRemotePacked $ SolverAPI.pack flags size ops t example
 
 
 outputMainSingle :: IO ()
@@ -91,5 +99,5 @@ outputMainMulti = do
 
 outputMain :: IO ()
 outputMain = do
-  p <- satLambdaRemote SolverAPI.sampleInput
+  p <- satLambdaRemotePacked SolverAPI.sampleInput
   print p

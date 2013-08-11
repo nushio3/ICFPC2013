@@ -10,7 +10,6 @@ import qualified Data.ByteString.Lazy.Char8 as BL8
 import qualified Data.Map as Map
 
 import BV(BitVector)
--- import qualified Gulwani4
 import SMTSynth
 import qualified WrapSMTSynth
 
@@ -31,6 +30,13 @@ data InputExample = InputExample
 $(deriveJSON (drop 1) ''SpecialFlags)
 $(deriveJSON (drop 7) ''InputExample)
 $(deriveJSON (drop 5) ''Input)
+
+pack :: SpecialFlags -> Int -> [String] -> Double -> Map.Map BitVector (Double, BitVector) ->
+        Input
+pack flags size ops t example =
+  (Input flags size ops t
+   (map (\(x, (y, z)) -> (InputExample x y z)) $ Map.assocs example))
+
 
 -- Calls WrapSMTSynth.satLambda using Input data.
 satLambda :: Input -> IO (Maybe String)
