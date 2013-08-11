@@ -121,12 +121,6 @@ genProgram myFlags oprs size = do
   opcs <- sWord8s [ printf "opc-%d" i | i <- take size [offs ..] ]
   constrain $ bAll (`inRange` (0, fromIntegral $ length oprs-1)) opcs
 
-  --let costs = map (literal . fromIntegral . argNum) oprs
-
-  --b <- liftIO $ randomIO
-  --when b $
-  --  constrain $ sum [ select costs (1 :: SInt8) opc | opc <- opcs ] - (literal $ fromIntegral $ length oprs) .<= (literal $ fromIntegral size)
-
   argss <- forM (take size [offs ..]) $ \ln -> do
     args <- sWord8s [ printf "arg-%d-%d" ln i | i <- [0::Int ..2] ]
     constrain $ bAll (.< (literal $ fromIntegral ln)) args
@@ -181,7 +175,6 @@ genProgram myFlags oprs size = do
     forM_ (drop offs varColors) $ 
       (\c -> constrain $ (c .== red) ||| (c.== green) ||| (c.==blue))
         
-      
     let candColorThm vars = flip map argss $ \[x, y, z] ->
           let var ix = select varColors 0 ix
               vx = var x
@@ -333,7 +326,7 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
   let go es = do
         -- putStrLn "behave..."
         putStrLn $ "inputs: " ++ show es
-        progn <- para cpuNum $ \i -> findProgram ((abs $ seeds !! 1)`mod`65536) myFlags oprs (size + i `mod` 3) $ take 5 es
+        progn <- para cpuNum $ \i -> findProgram ((abs $ seeds !! i)`mod`65536) myFlags oprs (size + i `mod` 3) $ take 5 es
         system "pkill z3"
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram myFlags oprs progn)
         o <- oracleDistinct ident $ toProgram myFlags oprs progn
