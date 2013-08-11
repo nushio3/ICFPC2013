@@ -3,6 +3,7 @@ import Data.Time
 import Data.Reflection
 import Control.Concurrent
 import Control.Concurrent.STM
+import Control.Exception
 import Control.Monad
 import Control.Lens
 import Data.List
@@ -22,8 +23,9 @@ import System.Timeout
 import BV (BitVector)
 import qualified API
 import qualified Data.Map as Map
-
+import Network.HTTP.Conduit
 import qualified WrapSMTSynth
+import SMTSynth hiding (Program)
 
 data Environment = Environment
     { examples :: TVar (Map.Map BitVector (Double, BitVector))
@@ -44,8 +46,7 @@ findCounterExamples prog = do
 
 genLambda :: Given Environment => Double -> IO ()
 genLambda t = do
-    ratio <- readTVarIO (strictness given)
-    atomically (readTVar (examples given)) >>= head (theSatLambdas given) (t * ratio) >>= \case
+    atomically (readTVar (examples given)) >>= head (theSatLambdas given) t >>= \case
         Just p -> do
             let prog = enrichProgram $ readProgram p
             findCounterExamples prog >>= \case
@@ -57,7 +58,7 @@ genLambda t = do
                         else do
                             atomically $ writeTVar (guessCandidate given) $ at p ?~ 1 $ m 
                 cs -> do
-                    atomically $ modifyTVar (examples given) $ flip (foldr (\i -> ix i . _1 +~ 1)) cs
+                    atomically $ modifyTVar (examples given) $ flip (foldr (\i -> ix i . _1 +~ 3)) cs
         Nothing -> return ()
 
 judgement :: Given Environment => IO ()
@@ -101,10 +102,10 @@ remainingTime = do
     t <- getCurrentTime
     return $ 60 * 5 - realToFrac (diffUTCTime t (startTime given))
 
-tooLarge :: Int -> [a] -> Bool
-tooLarge 0 (_:xs) = False
-tooLarge n (_:xs) = tooLarge (n - 1) xs
-tooLarge n [] = True
+notTooLarge :: Int -> [a] -> Bool
+notTooLarge 0 (_:xs) = False
+notTooLarge n (_:xs) = notTooLarge (n - 1) xs
+notTooLarge n [] = True
 
 manufactur :: (Given API.Token, Given Environment) => IO ()
 manufactur = do
@@ -121,7 +122,7 @@ manufactur = do
     where
         eval = do
             print "eval"
-            es' <- fmap (take 256 . sortBy (flip (compare `on` view _2)) . Map.toList)
+            es' <- fmap (take 240 . sortBy (flip (compare `on` view _2)) . Map.toList)
                 $ atomically $ readTVar (evalCandidate given)
             let es = map fst es'
             is <- (es++) <$> replicateM (256 - length es) randomIO
@@ -134,20 +135,23 @@ manufactur = do
             putStrLn "guess"
             gsc <- atomically $ readTVar (guessCandidate given)
             let (p, _) = maximumBy (compare `on` view _2) (Map.toList gsc)
-            when (tooLarge 1000 p) $ do
+            when (notTooLarge 1000 p) $ do
                 API.guess (API.Guess (theId given) (T.pack p)) >>= \case
-                    API.GuessResponse API.GuessWin _ _ -> putStrLn "Won!" >> kill'em_all >> exitSuccess
+                    API.GuessResponse API.GuessWin _ _ -> do
+                        putStrLn "Won!"
+                        kill'em_all
+                        simpleHttp "http://botis.org:9999/play/crash.wav"
+                        exitSuccess
                     API.GuessResponse API.GuessError _ (Just msg) -> putStrLn (T.unpack msg) >> kill'em_all >> exitSuccess
                     API.GuessResponse API.GuessMismatch (Just vs) _ -> do
                         addExample [(read $ T.unpack $ vs ^?! ix 0, 1000, read $ T.unpack $ vs ^?! ix 1)]
-                atomically $ modifyTVar (guessCandidate given) $ at p .~ Nothing
-                putStrLn "guess:Done."
+            atomically $ modifyTVar (guessCandidate given) $ at p .~ Nothing
 
 addExample :: Given Environment => [(BitVector, Double, BitVector)] -> IO ()
 addExample xs = do
     forM_ xs $ \(i, w, o) -> atomically $ modifyTVar (examples given) $ at i ?~ (w, o)
-    forkIO $ judgement
-    forkIO $ removeTrivial
+    removeTrivial
+    judgement
     return ()
     
 oracleSummoner :: (Given API.Token, Given Environment) => IO ()
@@ -163,7 +167,7 @@ oracleSummoner = forever $ do
 trainer :: Given Environment => IO ()
 trainer = forever $ do
     forkIO $ revealDistinguisher
-    threadDelay $ 6 * 1000 * 1000
+    threadDelay $ 5 * 1000 * 1000
 
 trainProblem :: Given API.Token => Int -> IO (T.Text, Int, [String])
 trainProblem level = do
@@ -171,7 +175,7 @@ trainProblem level = do
     return (ident, size, map T.unpack ops)
 
 main = getArgs >>= \case
-    (level : _) -> give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ do
+    (level : w1 : w2 : w3 : _) -> give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ do
         (ident, size, ops) <- trainProblem (read level)
         ves <- newTVarIO Map.empty
         vgs <- newTVarIO Map.empty
@@ -180,6 +184,8 @@ main = getArgs >>= \case
         oc <- newTVarIO 0
         t <- getCurrentTime
         st <- newTVarIO 1.0
+        let flags = defaultSpecialFlags & bonusMode .~ ("bonus" `elem` ops)
+                & tfoldMode .~ ("tfold" `elem` ops)
         let env = Environment { examples = ves
                 , guessCandidate = vgs
                 , evalCandidate = vev
@@ -187,13 +193,14 @@ main = getArgs >>= \case
                 , startTime = t
                 , theId = ident
                 , strictness = st
-                , theSatLambdas = [WrapSMTSynth.satLambda size ops]
+                , theSatLambdas = [WrapSMTSynth.satLambda flags size ops]
                 , _DEATH_NOTE = deathNote
                 }
         print (size, ops)
         (give env :: (Given Environment => IO ()) => IO ()) $ do
-            replicateM_ 4 $ spawn 10
-            replicateM_ 4 $ spawn 19
+            replicateM_ 3 $ spawn (read w1)
+            replicateM_ 3 $ spawn (read w2)
+            replicateM_ 3 $ spawn (read w3)
             forkKillme trainer
             oracleSummoner
 
@@ -210,12 +217,16 @@ kill'em_all = do
 
 spawn :: Given Environment => Double -> IO ThreadId
 spawn t = forkKillme $ forever $ do
-    timeout (floor $ t * 2 * 1000 * 1000) (genLambda t) >>= \case
-        Nothing -> z3Slayer
-        Just _ -> return ()
+    forkKillme $ timeout (floor $ t * 2 * 1000 * 1000) (genLambda t) >>= \case
+        Nothing -> z3Slayer >> putStrLn "Spawning: Failed."
+        Just _ -> putStrLn "Spawning: Done."
+    threadDelay $ 10 * 1000 * 1000
 
 z3Slayer = do
     procs <- map words <$> lines <$> readProcess "/bin/ps" [] ""
-    forM_ (map (!!0) $ filter (elem "<defunct>") procs) $ \pid -> do
-	putStrLn $ "kill " ++ pid
-	system $ "kill " ++ pid
+    forM_ (filter (elem "<defunct>") procs) $ \case
+      (pid:_) -> do
+	putStrLn $ "kill -9 " ++ pid
+	system $ "kill -9 " ++ pid
+        return ()
+      _ -> return ()

@@ -1,19 +1,32 @@
-{-# LANGUAGE LambdaCase, FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE LambdaCase, FlexibleContexts, OverloadedStrings, TemplateHaskell #-}
 module SMTSynth where
 
 import Data.SBV
 import System.Random
+import Control.Lens ((&), (^.), (.~))
+import Control.Lens.TH
 import Control.Monad
 import Data.Reflection
 import qualified Data.Text as T
 import Text.Printf
 import Data.Maybe
+import Debug.Trace
 import Control.Applicative
 import Data.List
 import Data.List.Split
 
 import API
 import qualified RichBV as BV
+
+data SpecialFlags = SpecialFlags
+  { _bonusMode :: Bool
+  , _tfoldMode :: Bool }
+  deriving (Eq, Ord, Read, Show)  
+
+$(makeLenses ''SpecialFlags)
+
+defaultSpecialFlags :: SpecialFlags
+defaultSpecialFlags = SpecialFlags False False 
 
 -- TODO: support fold
 -- if0, not, shl1, shr1, shr4, shr16, and, or, xor, plus
@@ -114,7 +127,7 @@ instance Applicative Symbolic where
 --type Addr = SWord16
 --type Val = SWord64
 
-data Opr = If0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus
+data Opr = If0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus 
   deriving (Eq, Show)
 
 argNum :: Opr -> Int
@@ -167,9 +180,9 @@ argNum opr = case opr of
 type SLoc = SWord8
 type Loc = Word8
 
-behave :: Bool -> [Opr] -> Int -> [SLoc] -> [[SLoc]] -> SWord64 -> SWord64 -> Symbolic ()
-behave isTFold oprs size opcs argss i o = do
-  let offs = if isTFold then 4 else 3 :: Int
+behave :: SpecialFlags -> [Opr] -> Int -> [SLoc] -> [[SLoc]] -> SWord64 -> SWord64 -> Symbolic ()
+behave myFlags oprs size opcs argss i o = do
+  let offs = if myFlags^.tfoldMode then 4 else 3 :: Int
 
   let candss vars = flip map argss $ \[x, y, z] ->
         let var ix = select vars 0 ix
@@ -187,7 +200,7 @@ behave isTFold oprs size opcs argss i o = do
           Plus  -> vx + vy
           If0   -> ite vx0 vy vz
 
-  if not isTFold
+  if not $ myFlags^.tfoldMode
     then do
       vars <- sWord64s [ printf "var-%d" ln | ln <- [0::Int ..size+offs-1]]
 
@@ -215,9 +228,9 @@ behave isTFold oprs size opcs argss i o = do
 
       go [ (i `shiftR` (8*s)) .&. 0xff | s <- [0..7]] 0
 
-genProgram :: Bool -> [Opr] -> Int -> Symbolic SProgram
-genProgram isTFold oprs size = do
-  let offs = if isTFold then 4 else 3 :: Int
+genProgram :: SpecialFlags -> [Opr] -> Int -> Symbolic SProgram
+genProgram myFlags oprs size = do
+  let offs = if myFlags ^. tfoldMode then 4 else 3 :: Int
 
   opcs <- sWord8s [ printf "opc-%d" i | i <- take size [offs ..] ]
   constrain $ bAll (`inRange` (0, fromIntegral $ length oprs-1)) opcs
@@ -256,6 +269,24 @@ genProgram isTFold oprs size = do
   opid (Shr 4)  $ \i j k -> i ./= 0 &&& i ./= 1
   opid (Shr 16) $ \i j k -> i ./= 0 &&& i ./= 1
 
+  when (myFlags ^. bonusMode) $ trace (printf "Bonus\\(^o^)/ size:%d\n" size) $ do
+    let lastOpcI  = length opcs - 1
+        lastOpcI2 = length opcs - 2
+        
+        lastAdrI  = length opcs - 1 + 3
+        lastAdrI2 = length opcs - 2 + 3
+        
+    case findIndex (==If0) oprs of
+      Nothing ->  error "Bonus problem without If0 \\(>_<)/"  
+      Just ifcode ->    
+        constrain $ (opcs !! lastOpcI) .== fromIntegral ifcode
+    case findIndex (==And) oprs of
+      Nothing ->  error "Bonus problem without And \\(>_<)/"        
+      Just andcode -> do
+        constrain $ (opcs!! lastOpcI2) .== fromIntegral andcode
+        constrain $ (argss !! lastOpcI !! 0) .== fromIntegral lastAdrI2
+        constrain $ (argss !! lastOpcI2!! 0) .== 1
+
   return (opcs, argss)
 
 --distinct :: [Opr] -> Int -> [(Word64, Word64)] -> Program -> IO (Maybe Word64)
@@ -279,18 +310,18 @@ genProgram isTFold oprs size = do
 --  generateSMTBenchmarks True "distinct" c
 --  return $ fmap read $ lookup "distinctInput" $ parseRes $ show res
 
-findProgram :: Bool -> [Opr] -> Int -> [(Word64, Word64)] -> IO Program
-findProgram isTFold oprs size samples = do
+findProgram :: SpecialFlags -> [Opr] -> Int -> [(Word64, Word64)] -> IO Program
+findProgram myFlags oprs size samples = do
   putStrLn $ "inputs: " ++ show samples
   let c = do
-        (opcs, argss) <- genProgram isTFold oprs size
+        (opcs, argss) <- genProgram myFlags oprs size
         forM_ samples $ \(i, o) ->
-          behave isTFold oprs size opcs argss (literal i) (literal o)
+          behave myFlags oprs size opcs argss (literal i) (literal o)
         return (true :: SBool)
   -- generateSMTBenchmarks True "find" c
   res <- sat c
   -- print res
-  return $ parseProgram isTFold $ show res
+  return $ parseProgram (myFlags^.tfoldMode) $ show res
 
 type Program  = ([Loc],  [[Loc]])
 type SProgram = ([SLoc], [[SLoc]])
@@ -318,9 +349,9 @@ toOp "plus"  = Just Plus
 toOp "if0"   = Just If0
 toOp _       = Nothing
 
-toProgram :: Bool -> [Opr] -> Program -> BV.Program
-toProgram isTFold oprs (opcs, argss) =
-  if not isTFold
+toProgram :: SpecialFlags -> [Opr] -> Program -> BV.Program
+toProgram myFlags oprs (opcs, argss) =
+  if not $ myFlags^.tfoldMode
     then BV.Program $ last ee
     else BV.Program $ BV.Fold 1 2 (BV.Var 0) (BV.Constant 0) $ last ff
  where
@@ -354,6 +385,11 @@ synth ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use fold (>
   let is = (i1 .|. 1) : (i0 .&. (complement 1)) : []
   os <- oracleIO ident is
 
+  let 
+    myFlags = defaultSpecialFlags
+      & bonusMode .~ ("bonus" `elem` ops')
+      & tfoldMode .~ ("tfold" `elem` ops')
+  
   let oprs = catMaybes $ map toOp ops
   let size = max 1 $ (ss + adj - sum (map pred $ map argNum oprs) + 1)
 
@@ -362,10 +398,9 @@ synth ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use fold (>
 
   let go e = do
         -- putStrLn "behave..."
-        progn <- findProgram isTFold oprs size e
-        -- print progn
-        putStrLn $ "found: " ++ (BV.printProgram $ toProgram isTFold oprs progn)
-        o <- oracleDistinct ident $ toProgram isTFold oprs progn
+        progn <- findProgram myFlags oprs size e
+        putStrLn $ "found: " ++ (BV.printProgram $ toProgram myFlags oprs progn)
+        o <- oracleDistinct ident $ toProgram myFlags oprs progn
         case o of
           Nothing -> do
             putStrLn "Accepted: yatapo-(^_^)!"
