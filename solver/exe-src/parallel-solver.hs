@@ -138,13 +138,13 @@ addExample xs = do
     
 oracleSummoner :: (Given API.Token, Given Environment) => IO ()
 oracleSummoner = forever $ do
-    manufactur
+    forkIO $ manufactur
     t <- readTVarIO (examples given)
     u <- readTVarIO (evalCandidate given)
     v <- readTVarIO (guessCandidate given)
     printf "Examples: %d, Eval: %d, Guess: %d\n" (Map.size t) (Map.size u) (Map.size v)
     threadDelay $ 4 * 1000 * 1000
-    
+
 trainer :: Given Environment => IO ()
 trainer = forever $ do
     revealDistinguisher
@@ -175,7 +175,7 @@ main = getArgs >>= \case
                 }
         
         (give env :: (Given Environment => IO ()) => IO ()) $ do
-            forkKillme $ forever $ genLambda 10
+            replicateM_ 8 $ spawn 10
             forkKillme trainer
             oracleSummoner
 
@@ -191,7 +191,7 @@ kill'em_all = do
     forM_ is killThread
 
 spawn :: Given Environment => Double -> IO ThreadId
-spawn t = forkKillme $ do
+spawn t = forkKillme $ forever $ do
     timeout (floor $ t * 2 * 1000 * 1000) (genLambda t) >>= \case
         Nothing -> z3Slayer
         Just _ -> return ()
