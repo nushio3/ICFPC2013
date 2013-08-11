@@ -11,6 +11,7 @@ import Data.Maybe
 import Control.Applicative
 import Control.Monad.Trans
 import Data.List
+import Data.Function
 
 import API
 
@@ -29,5 +30,12 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
     case find (\p -> problemId p == T.pack tid) problems of
       Just p  -> synth (problemSize p) (problemOperators p) (problemId p)
       Nothing -> fail "No such problem"
+  ["auto"] -> do
+    putStrLn "You start automatic solving mode, really?"
+    "y" <- getLine
+    problems <- myproblems
+    forM_ (sortBy (compare `on` problemSize) problems) $ \p -> do
+      when (isSolved p /= Just True && timeLeft p /= Just 0) $ do
+        synth (problemSize p) (problemOperators p) (problemId p)
   _ -> do
     fail "invalid input ('_`)"
