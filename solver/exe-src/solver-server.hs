@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings, DeriveDataTypeable #-}
 
+import Control.Concurrent
 import Control.Monad.Trans
 import Data.Aeson.Types as JSON
 import qualified Data.Aeson as JSON
@@ -15,11 +16,17 @@ import Network.Wai.Middleware.RequestLogger
 import Gulwani4
 import SolverAPI
 
+-- Port: port to listen.
+-- weight: sec to sleep before handling request. Pure debug purpose.
+data ServerOptions = ServerOptions
+  { port :: Int
+  , weight :: Int
+  } deriving (Show, Data, Typeable)
 
-data ServerOptions = ServerOptions { port :: Int }
-                   deriving (Show, Data, Typeable)
-server_options = ServerOptions {port = 10203  &= help "port number"}
-                 &= summary "solver server"
+server_options = ServerOptions {
+  port = 10203  &= help "port number",
+  weight = 0 &= help "debug flag to have weight"
+  } &= summary "solver server"
 
 {-
 - Things to be implemented:
@@ -27,12 +34,11 @@ server_options = ServerOptions {port = 10203  &= help "port number"}
 -}
 
 main = runserver =<< cmdArgs server_options where
-  runserver (ServerOptions port) = scotty port $ do
+  runserver (ServerOptions port weight) = scotty port $ do
     middleware logStdoutDev
 
-    get "/" $ text "foobar"
-
     post "/solve" $ do
+      liftIO $ threadDelay (weight * 1000 * 1000)
       b <- body
       -- I forgot how to handle maybe around here. Plz get rid of those stupid cases.
       case (JSON.decode b :: Maybe SolverAPI.Input) of
