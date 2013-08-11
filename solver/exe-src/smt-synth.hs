@@ -13,9 +13,9 @@ import Control.Monad.Trans
 import Data.List
 import Data.Function
 import System.Timeout
+import Control.Exception
 
 import API
-
 import SMTSynth
 
 main :: IO ()
@@ -56,7 +56,11 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
 
     forM_ (sortBy (compare `on` problemSize) problems) $ \p -> do
       when (isSolved p /= Just True && timeLeft p /= Just 0) $ do
-        mb <- timeout (300*10^6) $ synth (read cpu) (problemSize p) (problemOperators p) (problemId p)
-        when (isNothing mb) $ putStrLn "timeout poyo ('_`) tsurai..."
+        emb <- try $ timeout (300*10^6) $ synth (read cpu) (problemSize p) (problemOperators p) (problemId p)
+        case emb of
+          Left err -> print (err :: SomeException)
+          Right mb -> do
+            when (isNothing mb) $ do
+              putStrLn "timeout poyo ('_`) tsurai..."
   _ -> do
     fail "invalid input ('_`)"
