@@ -28,6 +28,7 @@ import qualified Data.Map as Map
 import Network.HTTP.Conduit
 import qualified RemoteSolver
 import Z3Slayer
+import SMTSynth hiding (Program)
 
 data Environment = Environment
     { examples :: TVar (Map.Map BitVector (Double, BitVector))
