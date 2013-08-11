@@ -3,15 +3,13 @@ module SMTSynth where
 
 
 import Data.SBV
-import System.Random
+-- import System.Random
 import Control.Monad
 import Data.Reflection
 import qualified Data.Text as T
 import Text.Printf
-import System.Environment
 import Data.Maybe
 import Control.Applicative
-import Control.Monad.Trans
 import Data.List.Split
 
 import API
@@ -119,16 +117,16 @@ instance Applicative Symbolic where
 data Opr = If0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus
   deriving (Eq, Show)
 
---argNum :: Opr -> Int 0) 0
---argNum opr = case opr of
---  If0   -> 3
---  Not   -> 1
---  Shl _ -> 1
---  Shr _ -> 1
---  And   -> 2
---  Or    -> 2
---  Xor   -> 2
---  Plus  -> 2
+argNum :: Opr -> Int
+argNum opr = case opr of
+  If0   -> 3
+  Not   -> 1
+  Shl _ -> 1
+  Shr _ -> 1
+  And   -> 2
+  Or    -> 2
+  Xor   -> 2
+  Plus  -> 2
 
 --data Alloc a = Alloc { _aOut :: a, _aArg :: [a] }
 
@@ -183,6 +181,7 @@ behave oprs size opcs argss i o = do
         let vx = var x
             vy = var y
             vz = var z
+            vx0 = vx .== 0
         in flip map oprs $ \opr -> case opr of
           Not   -> complement vx
           Shl n -> vx `shiftL` n
@@ -191,7 +190,7 @@ behave oprs size opcs argss i o = do
           Or    -> vx .|. vy
           Xor   -> vx `xor` vy
           Plus  -> vx + vy
-          If0   -> ite (vx .== 0) vy vz
+          If0   -> ite vx0 vy vz
 
   forM_ (zip3 [3..] candss opcs) $ \(ln, cands, opc) ->
     constrain $ vars !! ln .== select cands 0 opc
@@ -231,13 +230,13 @@ distinct oprs size samples (oopcs, oargss) = do
 
 findProgram :: [Opr] -> Int -> [(Word64, Word64)] -> IO Program
 findProgram oprs size samples = do
-  print (oprs, size, samples)
+  putStrLn $ "inputs: " ++ show samples
   let c = do
         (opcs, argss) <- genProgram oprs size
         forM_ samples $ \(i, o) ->
           behave oprs size opcs argss (literal i) (literal o)
         return (true :: SBool)
-  generateSMTBenchmarks True "find" c
+  -- generateSMTBenchmarks True "find" c
   res <- sat c
   return $ parseProgram $ show res
 
@@ -245,12 +244,12 @@ type Program  = ([Loc],  [[Loc]])
 type SProgram = ([SLoc], [[SLoc]])
 
 parseRes :: String -> [(String, String)]
-parseRes ss = [ (name, val) | (name: "=": val: _) <- map words $ lines ss ]
+parseRes ss = [ (nam, val) | (nam: "=": val: _) <- map words $ lines ss ]
 
 parseProgram :: String -> Program
 parseProgram ss = (opcs, argss) where
-  opcs  = map read $ catMaybes $ takeWhile isJust [ lookup ("opc-" ++ show i) mm | i <- [3..] ]
-  argss = chunksOf 3 $ map read $ catMaybes $ takeWhile isJust [ lookup ("arg-" ++ show i ++ "-" ++ show j) mm | i <- [3..], j <- [0..2] ]
+  opcs  = map read $ catMaybes $ takeWhile isJust [ lookup ("opc-" ++ show i) mm | i <- [3::Int ..] ]
+  argss = chunksOf 3 $ map read $ catMaybes $ takeWhile isJust [ lookup ("arg-" ++ show i ++ "-" ++ show j) mm | i <- [3::Int ..], j <- [0::Int ..2] ]
   mm    = parseRes ss
 
 toOp :: T.Text -> Maybe Opr
@@ -280,23 +279,24 @@ toProgram oprs (opcs, argss) = BV.Program $ last ls where
     Xor     -> BV.Op2 BV.Xor  (ls !! i) (ls !! j)
     Plus    -> BV.Op2 BV.Plus (ls !! i) (ls !! j)
     If0     -> BV.If (ls !! i) (ls !! j) (ls !! k)
+  toExp _ _ = error "tsurapoyo"
 
 synth :: Given Token => Int -> [T.Text] -> T.Text -> IO ()
 synth ss ops ident = do
-  let size = ss - 2
-  putStrLn $ "Start synthesis: " ++ show size ++ ", " ++ show ops
-
-  let initNum = 4
   -- is <- zipWith (\i v -> v `div` initNum * initNum + i) [0..] <$> replicateM (fromIntegral initNum) randomIO
-  let is = [0,1,2,4]
+  when ("fold" `elem` ops || "tfold" `elem` ops) $ fail "I can not use fold (>_<)"
+
+  let is = [0, 1]
   os <- oracleIO ident is
 
   let oprs = catMaybes $ map toOp ops
+  let size = max 1 $ ss - 2 -- - sum (map pred $ map argNum oprs)
+
+  putStrLn $ "Start synthesis: " ++ T.unpack ident ++ " " ++ show ss ++ " (" ++ show size ++ "), " ++ show ops
 
   let go e = do
-        putStrLn "behave..."
+        -- putStrLn "behave..."
         progn <- findProgram oprs size e
-        putStrLn $ "found: " ++ show progn
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram oprs progn)
         (f, g) <- oracleDistinct ident $ toProgram oprs progn
         putStrLn $ "distinct: " ++ show (f, g)
@@ -310,4 +310,3 @@ synth ss ops ident = do
         --    go ((f, g):e)
 
   go $ zip is os
-  undefined
