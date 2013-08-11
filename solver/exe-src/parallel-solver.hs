@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, MultiWayIf, FlexibleContexts, ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase, MultiWayIf, FlexibleContexts, ScopedTypeVariables, Rank2Types #-}
 import qualified Data.Vector as V
 import Data.Time
 import Data.Reflection
@@ -10,26 +10,28 @@ import Data.List
 import Data.Function
 import Convert
 import RichBV
+import Text.Printf
 import System.Random
+import System.Process
 import System.IO.Unsafe
 import qualified Data.Text as T
 import SRichBV
 import Control.Applicative
+import System.Timeout
 import BV (BitVector)
 import qualified API
 import qualified Data.Map as Map
+import qualified Gulwani4
 type Candidate = V.Vector
 data Environment = Environment
-    { examples :: TVar (Map.Map BitVector (Float, BitVector))
-    , guessCandidate :: TVar (Map.Map String Float)
-    , evalCandidate :: TVar (Map.Map BitVector Float)
+    { examples :: TVar (Map.Map BitVector (Double, BitVector))
+    , guessCandidate :: TVar (Map.Map String Double)
+    , evalCandidate :: TVar (Map.Map BitVector Double)
     , oracleCount :: TVar Int
     , startTime :: UTCTime
-    , theProblem :: API.Problem
+    , theId :: T.Text
+    , theSatLambdas :: [Map.Map BitVector (Double, BitVector) -> IO (Maybe String)]
     }
-
-satLambda :: API.Problem -> Map.Map BitVector (Float, BitVector) -> IO (Maybe String)
-satLambda = undefined
 
 findCounterExamples :: Given Environment => Program -> IO [BitVector]
 findCounterExamples prog = do
@@ -37,7 +39,7 @@ findCounterExamples prog = do
     return $ [i | (i, (p, o)) <- Map.toList es, eval prog i /= o ]
 
 genLambda :: Given Environment => IO ()
-genLambda = atomically (readTVar (examples given)) >>= satLambda (theProblem given) >>= \case
+genLambda = atomically (readTVar (examples given)) >>= head (theSatLambdas given) >>= \case
     Just p -> do
         let prog = enrichProgram $ readProgram p
         findCounterExamples prog >>= \case
@@ -88,42 +90,56 @@ revealDistinguisher = do
                 then atomically $ modifyTVar' (guessCandidate given) $ at (fst a) .~ Nothing
                 else atomically $ modifyTVar' (guessCandidate given) $ at (fst b) .~ Nothing
 
-remainingTime :: Given Environment => IO Float
+remainingTime :: Given Environment => IO Double
 remainingTime = do
     t <- getCurrentTime
-    return $ realToFrac $ diffUTCTime t (startTime given)
+    return $ 60 * 5 - realToFrac (diffUTCTime t (startTime given))
 
 manufactur :: (Given API.Token, Given Environment) => IO ()
 manufactur = do
     t <- remainingTime
     n <- atomically $ readTVar (oracleCount given)
+    atomically $ modifyTVar (oracleCount given) (+1)
     numEvalCandidate <- fmap Map.size $ atomically $ readTVar (evalCandidate given)
     numGuessCandidate <- fmap Map.size $ atomically $ readTVar (guessCandidate given)
     if
         | t < 60, odd n -> guess
-        | numEvalCandidate >= 256 , numGuessCandidate > 16 -> eval
+        | numEvalCandidate >= 256, numGuessCandidate > 16 -> eval
         | numGuessCandidate == 0 -> eval
         | otherwise -> guess
     where
         eval = do
-            (es, rest) <- fmap (splitAt 256 . sortBy (flip (compare `on` view _2)) . Map.toList)
+            print "eval"
+            (es, rest) <- fmap (splitAt 256 . map fst . sortBy (flip (compare `on` view _2)) . Map.toList)
                 $ atomically $ readTVar (evalCandidate given)
-            let is = map fst es
-            API.eval (API.EvalRequest (Just $ API.problemId $ theProblem given) Nothing (map (T.pack . show) is)) >>= \case
-                API.EvalResponse API.EvalOk (Just os) _ -> atomically $ modifyTVar (examples given) $ foldl (.) id (zipWith (\x y -> at x ?~ (1, y)) is os)
+            is <- (++ es) <$> replicateM (256 - length es) randomIO
+
+            API.eval (API.EvalRequest (Just $ theId given) Nothing (map (T.pack . printf "0x%016X") is)) >>= \case
+                API.EvalResponse API.EvalOk (Just os) _ -> addExample $ zip3 is (repeat 1) os
+                API.EvalResponse API.EvalError _ (Just msg) -> putStrLn (T.unpack msg)
         guess = do
+            print "guess"
             gsc <- atomically $ readTVar (guessCandidate given)
             let (p, _) = maximumBy (compare `on` view _2) (Map.toList gsc)
-            API.guess (API.Guess (API.problemId $ theProblem given) (T.pack p)) >>= \case
+            API.guess (API.Guess (theId given) (T.pack p)) >>= \case
                 API.GuessResponse API.GuessWin _ _ -> fail "Won!"
                 API.GuessResponse API.GuessError _ (Just msg) -> fail (T.unpack msg)
                 API.GuessResponse API.GuessMismatch (Just vs) _ -> do
-                    atomically $ modifyTVar (examples given) $ at (read $ T.unpack $ vs ^?! ix 0)
-                        ?~ (1000, read $ T.unpack $ vs ^?! ix 1)
+                    addExample [(read $ T.unpack $ vs ^?! ix 0, 1000, read $ T.unpack $ vs ^?! ix 1)]
 
+addExample :: Given Environment => [(BitVector, Double, BitVector)] -> IO ()
+addExample xs = do
+    forM_ xs $ \(i, w, o) -> atomically $ modifyTVar (examples given) $ at i ?~ (w, o)
+    judgement
+    removeTrivial
+    
 oracleSummoner :: (Given API.Token, Given Environment) => IO ()
 oracleSummoner = forever $ do
     manufactur
+    t <- readTVarIO (examples given)
+    u <- readTVarIO (evalCandidate given)
+    v <- readTVarIO (guessCandidate given)
+    printf "Examples: %d, Eval: %d, Guess: %d\n" (Map.size t) (Map.size u) (Map.size v)
     threadDelay $ 4 * 1000 * 1000
     
 trainer :: Given Environment => IO ()
@@ -131,14 +147,16 @@ trainer = forever $ do
     revealDistinguisher
     threadDelay $ 6 * 1000 * 1000
 
-getProblem :: IO API.Problem
-getProblem = undefined
+trainProblem :: Given API.Token => Int -> IO (T.Text, Int, [String])
+trainProblem level = do
+    API.TrainingProblem prog ident size ops <- API.train $ API.TrainRequest level []
+    return (ident, size, map T.unpack ops)
 
-main = do
-    problem <- getProblem
+main = give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ do
+    (ident, size, ops) <- trainProblem 5
     ves <- newTVarIO Map.empty
     vgs <- newTVarIO Map.empty
-    vev <- newTVarIO Map.empty
+    vev <- newTVarIO $ Map.fromList $ zip [0,1,2,3,4,5,15,16,17,65535,65536,65537] (repeat 0)
     oc <- newTVarIO 0
     t <- getCurrentTime
     let env = Environment { examples = ves
@@ -146,9 +164,21 @@ main = do
             , evalCandidate = vev
             , oracleCount = oc
             , startTime = t
-            , theProblem = problem
+            , theId = ident
+            , theSatLambdas = [Gulwani4.satLambda size ops]
             }
-    give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ give env $ do
-        forkIO oracleSummoner
-        forkIO trainer
     
+    (give env :: (Given Environment => IO ()) => IO ()) $ do
+        forkIO $ forever $ genLambda
+        forkIO trainer
+        oracleSummoner
+
+spawn :: Given Environment => Double -> IO ThreadId
+spawn t = forkIO $ do
+    timeout (floor $ t * 2 * 1000 * 1000) genLambda >>= \case
+        Nothing -> z3Slayer
+        Just _ -> return ()
+
+z3Slayer = do
+    procs <- map words <$> lines <$> readProcess "/usr/bin/ps" [] ""
+    forM_ (map (!!0) $ filter (elem "<defunct>") procs) $ \pid -> system $ "kill -9" ++ pid
