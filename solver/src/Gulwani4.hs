@@ -18,7 +18,10 @@ import qualified Data.Vector as V
 import Network.HTTP.Base (urlEncode, urlDecode)
 import Text.Printf
 
+import Convert
 import BV(BitVector)
+import RichBV(printProgram)
+import qualified BV
 import SBV(SBitVector)
 
 type Addr = SWord8
@@ -144,15 +147,32 @@ satLambda _ _  exampleMap = do
 parseSBVOutput :: String -> IO (Maybe String)
 parseSBVOutput outputStr = do
   mapM_ print $ Map.toList satMap
-  print $ expand rootEdge
-  return ret
+  return $ Just $ printProgram $ enrichProgram $ BV.Program "x" $ expand rootEdge
   where
-    expand :: VarEdge -> String
+    expand :: VarEdge -> BV.Expr
     expand (OutEdge key) = 
-      printf "(%s)" $ unwords $ (key : ) $
+      expandExpr opr $
       map (expand . (oEdgeDict V.!) . (satMap Map.!) ) inEdges
       where opr = view (from oprToKey) (takeWhile (/='#') key)
             inEdges = [InEdge key i| i<- [0..arity opr-1]]
+    
+    expandExpr :: Op -> [BV.Expr] -> BV.Expr
+    expandExpr opr args = case (opr, args) of
+      (Const 0, [])-> BV.C0
+      (Const 1, [])-> BV.C1
+      (Var    , [])-> BV.Var "x"
+      (Not    , [a])-> BV.Op1 BV.Not a
+      (Shl  1 , [a])-> BV.Op1 BV.Shl1 a
+      (Shr  1 , [a])-> BV.Op1 BV.Shr1 a
+      (Shr  4 , [a])-> BV.Op1 BV.Shr4 a
+      (Shr 16 , [a])-> BV.Op1 BV.Shr16 a
+      (And    , [a,b])-> BV.Op2 BV.And a b
+      (Or     , [a,b])-> BV.Op2 BV.Or a b
+      (Xor    , [a,b])-> BV.Op2 BV.Xor a b
+      (Plus   , [a,b])-> BV.Op2 BV.Plus a b
+      (If0  , [a,b,c])-> BV.If0 a b c
+      _       -> error $ printf "unexpected op and arity in SBV output: %s(%d)"  
+                   (show opr) (length args)
     
     oEdgeDict :: V.Vector VarEdge
     oEdgeDict = 
