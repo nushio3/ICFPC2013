@@ -30,7 +30,7 @@ data Environment = Environment
     , oracleCount :: TVar Int
     , startTime :: UTCTime
     , theId :: T.Text
-    , theSatLambdas :: [Map.Map BitVector (Double, BitVector) -> IO (Maybe String)]
+    , theSatLambdas :: [Double -> Map.Map BitVector (Double, BitVector) -> IO (Maybe String)]
     }
 
 findCounterExamples :: Given Environment => Program -> IO [BitVector]
@@ -38,8 +38,8 @@ findCounterExamples prog = do
     es <- atomically (readTVar (examples given))
     return $ [i | (i, (p, o)) <- Map.toList es, eval prog i /= o ]
 
-genLambda :: Given Environment => IO ()
-genLambda = atomically (readTVar (examples given)) >>= head (theSatLambdas given) >>= \case
+genLambda :: Given Environment => Double -> IO ()
+genLambda t = atomically (readTVar (examples given)) >>= head (theSatLambdas given) t >>= \case
     Just p -> do
         let prog = enrichProgram $ readProgram p
         findCounterExamples prog >>= \case
@@ -115,7 +115,7 @@ manufactur = do
             is <- (++ es) <$> replicateM (256 - length es) randomIO
 
             API.eval (API.EvalRequest (Just $ theId given) Nothing (map (T.pack . printf "0x%016X") is)) >>= \case
-                API.EvalResponse API.EvalOk (Just os) _ -> addExample $ zip3 is (repeat 1) os
+                API.EvalResponse API.EvalOk (Just os) _ -> addExample $ zip3 is (repeat 60) os
                 API.EvalResponse API.EvalError _ (Just msg) -> putStrLn (T.unpack msg)
         guess = do
             print "guess"
@@ -156,7 +156,7 @@ main = give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ do
     (ident, size, ops) <- trainProblem 5
     ves <- newTVarIO Map.empty
     vgs <- newTVarIO Map.empty
-    vev <- newTVarIO $ Map.fromList $ zip [0,1,2,3,4,5,15,16,17,65535,65536,65537] (repeat 0)
+    vev <- newTVarIO $ Map.fromList $ zip [0,1,2,3,4,5,15,16,17,65535,65536,65537] (repeat 50)
     oc <- newTVarIO 0
     t <- getCurrentTime
     let env = Environment { examples = ves
@@ -169,13 +169,13 @@ main = give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ do
             }
     
     (give env :: (Given Environment => IO ()) => IO ()) $ do
-        forkIO $ forever $ genLambda
+        forkIO $ forever $ genLambda 10
         forkIO trainer
         oracleSummoner
 
 spawn :: Given Environment => Double -> IO ThreadId
 spawn t = forkIO $ do
-    timeout (floor $ t * 2 * 1000 * 1000) genLambda >>= \case
+    timeout (floor $ t * 2 * 1000 * 1000) (genLambda t) >>= \case
         Nothing -> z3Slayer
         Just _ -> return ()
 

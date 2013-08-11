@@ -136,7 +136,7 @@ progOfSize size0 opList0 = do
   return (thmWfp, LVProgram {-  ret -}  addrLib)
 
 testMain =  do
-  satLambda 20 ["plus", "if0"] $
+  satLambda 20 ["plus", "if0"] 60 $
     Map.fromList 
       [( 0 , (1.341, 1))
       ,( 3 , (1.341, 6)) ]
