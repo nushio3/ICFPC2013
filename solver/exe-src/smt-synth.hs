@@ -9,6 +9,8 @@ import Text.Printf
 import System.Environment
 import Data.Maybe
 import Control.Applicative
+import Control.Monad.Trans
+import Data.List.Split
 
 import API
 
@@ -17,7 +19,7 @@ import API
 
 oracleIO :: Given Token => T.Text -> [Word64] -> IO [Word64]
 oracleIO ident inputs = do
-  EvalResponse estat (Just eout) emsg <- API.eval $ EvalRequest (Just ident) Nothing $ map (T.pack . printf "0x%016X") inputs
+  EvalResponse _estat (Just eout) _emsg <- API.eval $ EvalRequest (Just ident) Nothing $ map (T.pack . printf "0x%016X") inputs
   return eout
 
 --valid :: [SWord8] -> SBool
@@ -86,149 +88,190 @@ oracleIO ident inputs = do
 --    Right (_, v) -> return $ Just v
 --    Left _ -> return Nothing
 
-type Operator1 = SWord64 -> SWord64
-type Operator2 = SWord64 -> SWord64 -> SWord64
-type Operator3 = SWord64 -> SWord64 -> SWord64 -> SWord64
+instance Applicative Symbolic where
+  pure = return
+  a <*> b = do
+    f <- a
+    x <- b
+    return $ f x
 
-behave :: Int
-          -> [T.Text] -> [Operator1]
-          -> [T.Text] -> [Operator2]
-          -> [T.Text] -> [Operator3]
-          -> [(Word64, Word64)]
-          -> IO [Word8]
-behave size name1s op1s name2s op2s name3s op3s samples = do
-  let total = length op1s + length op2s + length op3s
-      opmax = size - 1
-      progsize = total * opmax
+--type Addr = SWord16
+--type Val = SWord64
 
-      prog1 = concatMap (replicate opmax) op1s
-      prog2 = concatMap (replicate opmax) op2s
-      prog3 = concatMap (replicate opmax) op3s
+data Opr = If0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus
+  deriving (Eq, Show)
 
-  let pp = do
-        args1 <- forM [0..length prog1-1] $ \i ->
-          sInt16s [ "arg1-" ++ show i ++ "-" ++ show j | j <- [0..0] ]
-        args2 <- forM [0..length prog2-1] $ \i ->
-          sInt16s [ "arg2-" ++ show i ++ "-" ++ show j | j <- [0..1] ]
-        args3 <- forM [0..length prog3-1] $ \i ->
-          sInt16s [ "arg3-" ++ show i ++ "-" ++ show j | j <- [0..2] ]
+--argNum :: Opr -> Int
+--argNum opr = case opr of
+--  If0   -> 3
+--  Not   -> 1
+--  Shl _ -> 1
+--  Shr _ -> 1
+--  And   -> 2
+--  Or    -> 2
+--  Xor   -> 2
+--  Plus  -> 2
 
-        let allArgs = args1 ++ args2 ++ args3
+--data Alloc a = Alloc { _aOut :: a, _aArg :: [a] }
 
-        l <- sInt16s $ [ "line-" ++ show i | i <- [0..progsize-1] ]
-        result <- sInt16 "result"
-        constrain $ inRange result (0, literal $ fromIntegral $ progsize + 3 - 1)
+--allocs :: Alloc a -> [a]
+--allocs (Alloc a is) = a : is
 
-        -- constraints for l
-        constrain $ bAll (\ln -> inRange ln (3, literal (fromIntegral $ progsize + 3 - 1))) l
-        constrain $ allDifferent l
+--behave :: [Opr]
+--       -> [Alloc Addr]
+--       -> [(Word64, Word64)]
+--       -> Symbolic SBool
+--behave oprs locs samples = do
+--  forM_ samples $ \(i, o) ->
+--    phiFunc i o
+--  return true
 
-        -- constraints for argix
-        forM_ (zip l allArgs) $ \(lineno, arg) -> do
-          forM_ arg $ \a -> constrain $ inRange a (0, lineno - 1)
+--  where
+--    len = length oprs
 
-        -- let go (x:xs@(_:_)) = (x .<= 2 ||| bAll (x ./=) xs) &&& go xs
-        --     go _ = true
-        -- constrain $ go $ concat allArgs
+--    phiFunc :: Word64 -> Word64 -> Symbolic ()
+--    phiFunc i o = do
+--      vars@(v0:v1:v2:_) <- mapM (mkAlloc $ sWord64 "var") oprs
+--      constrain $ _aOut v0 .== 0
+--      constrain $ _aOut v1 .== 1
+--      constrain $ _aOut v2 .== literal i
+--      forM_ (zip locs vars) $ \(loc, var) -> do
+--        constrain $ ite (_aOut loc .== literal (fromIntegral len - 1)) (_aOut var .== literal o) true
+--      forM_ (zip oprs vars) $ \(opr, var) ->
+--        constrain $ oprSat opr var
 
-        -- constrain for examples
-        forM_ (zip [1..] samples) $ \(ii, (i, o)) -> do
-          vars <- sWord64s ["var-" ++ show ii ++ "-" ++ show i | i <- [0..progsize+3-1] ]
-          let var ix = select vars 0 (ix :: SInt16)
+--      let as = zip (concatMap allocs locs) (concatMap allocs vars)
+--      liftIO $ print $ length as
+--      let conss = [ (a .== c) ==> (b .== d)
+--                  | (i, (a, b)) <- zip [0..] as
+--                  , (j, (c, d)) <- zip [0..] as
+--                  , i < j ]
+--      mapM_ constrain conss
 
-          constrain $ (vars !! 0) .== 0
-          constrain $ (vars !! 1) .== 1
-          constrain $ (vars !! 2) .== literal i
-          constrain $ var result  .== literal o
+type SLoc = SWord8
+type Loc = Word8
 
-          -- constraints for operation
-          constrain
-            $ bAll (\(v,opr,[a1]) -> v .== opr (var a1))
-            $ zip3 (drop 3 vars) prog1 args1
-          constrain
-            $ bAll (\(v,opr,[a1,a2]) -> v .== opr (var a1) (var a2))
-            $ zip3 (drop (3+length prog1) vars) prog2 args2
-          constrain
-            $ bAll (\(v,opr,[a1,a2,a3]) -> v .== opr (var a1) (var a2) (var a3))
-            $ zip3 (drop (3+length prog1+length prog2) vars) prog3 args3
+behave :: [Opr] -> Int -> [SLoc] -> [[SLoc]] -> SWord64 -> SWord64 -> Symbolic ()
+behave oprs size opcs argss i o = do
+  vars <- sWord64s [ printf "var-%d" ln | ln <- [0::Int ..size+3-1]]
+  let var ix = select vars 0 ix
+
+  constrain $ (vars !! 0) .== 0
+  constrain $ (vars !! 1) .== 1
+  constrain $ (vars !! 2) .== i
+  constrain $ last vars   .== o
+
+  let candss = flip map argss $ \[x, y, z] ->
+        let vx = var x
+            vy = var y
+            vz = var z
+        in flip map oprs $ \opr -> case opr of
+          Not   -> complement vx
+          Shl n -> vx `shiftL` n
+          Shr n -> vx `shiftR` n
+          And   -> vx .&. vy
+          Or    -> vx .|. vy
+          Xor   -> vx `xor` vy
+          Plus  -> vx + vy
+          If0   -> ite (vx .== 0) vy vz
+
+  forM_ (zip3 [3..] candss opcs) $ \(ln, cands, opc) ->
+    constrain $ vars !! ln .== select cands 0 opc
+
+distinct :: [Opr] -> Int -> [(Word64, Word64)] -> Program -> IO (Maybe Word64)
+distinct oprs size samples (oopcs, oargss) = do
+  let c = do
+        opcs <- sWord8s [ printf "opc-%d" i | i <- take size [3::Int ..] ]
+        constrain $ bAll (`inRange` (0, fromIntegral $ length oprs-1)) opcs
+
+        argss <- forM (take size [3::Int ..]) $ \ln -> do
+          args <- sWord8s [ printf "arg-%d-%d" ln i | i <- [0::Int ..2] ]
+          constrain $ bAll (.< (literal $ fromIntegral ln)) args
+          return args
+
+        forM_ samples $ \(i, o) ->
+          behave oprs size opcs argss (literal i) (literal o)
+
+        i <- sWord64 "distinctInput"
+        o0 <- sWord64 "distinctOutput0"
+        o1 <- sWord64 "distinctOutput1"
+        constrain $ o0 ./= o1
+        behave oprs size (map literal oopcs) (map (map literal) oargss) i o0
+        behave oprs size opcs argss i o1
 
         return (true :: SBool)
 
-  generateSMTBenchmarks True "test" pp
-  res <- sat pp
+  res <- sat c
+  return $ fmap read $ lookup "distinctInput" $ parseRes $ show res
 
-  let ss = [ (name, val) | (name: "=": val: _) <- map words $ lines $ show res ]
-  print ss
+findProgram :: [Opr] -> Int -> [(Word64, Word64)] -> IO Program
+findProgram oprs size samples = do
+  print (oprs, size, samples)
+  let c = do
+        opcs <- sWord8s [ printf "opc-%d" i | i <- take size [3::Int ..] ]
+        constrain $ bAll (`inRange` (0, fromIntegral $ length oprs-1)) opcs
 
-  forM_ (zip [0..] $ concatMap (replicate opmax) name1s) $ \(i, name) -> do
-    printf "v%s = %s v%s\n"
-      (fromJust $ lookup (printf "line-%d" (i :: Int)) ss)
-      (T.unpack name)
-      (fromJust $ lookup (printf "arg1-%d-0" i) ss)
-  forM_ (zip [0..] $ concatMap (replicate opmax) name2s) $ \(i, name) -> do
-    printf "v%s = %s v%s v%s\n"
-      (fromJust $ lookup (printf "line-%d" (length name1s + i :: Int)) ss)
-      (T.unpack name)
-      (fromJust $ lookup (printf "arg2-%d-0" i) ss)
-      (fromJust $ lookup (printf "arg2-%d-1" i) ss)
-  forM_ (zip [0..] $ concatMap (replicate opmax) name3s) $ \(i, name) -> do
-    printf "v%s = %s v%s v%s v%3\n"
-      (fromJust $ lookup (printf "line-%d" (length name1s + length name2s + i :: Int)) ss)
-      (T.unpack name)
-      (fromJust $ lookup (printf "arg3-%d-0" i) ss)
-      (fromJust $ lookup (printf "arg3-%d-1" i) ss)
-      (fromJust $ lookup (printf "arg3-%d-2" i) ss)
+        argss <- forM (take size [3::Int ..]) $ \ln -> do
+          args <- sWord8s [ printf "arg-%d-%d" ln i | i <- [0::Int ..2] ]
+          constrain $ bAll (.< (literal $ fromIntegral ln)) args
+          return args
 
-  printf "ret = v%s\n" $ fromJust $ lookup "result" ss
+        forM_ samples $ \(i, o) ->
+          behave oprs size opcs argss (literal i) (literal o)
 
-  undefined
+        return (true :: SBool)
+  -- generateSMTBenchmarks True "test" c
+  res <- sat c
+  return $ parseProgram $ show res
 
-distinct :: Int -> Int -> [(Word64, Word64)] -> [Word8] -> IO (Maybe Word64)
-distinct = undefined
+type Program = ([Loc], [[Loc]])
 
-toOp1 :: T.Text -> Maybe Operator1
-toOp1 "not"   = Just $ complement
-toOp1 "shl1"  = Just $ \a -> a `shiftL` 1
-toOp1 "shr1"  = Just $ \a -> a `shiftR` 1
-toOp1 "shr4"  = Just $ \a -> a `shiftR` 4
-toOp1 "shr16" = Just $ \a -> a `shiftR` 16
-toOp1 _       = Nothing
+parseRes :: String -> [(String, String)]
+parseRes ss = [ (name, val) | (name: "=": val: _) <- map words $ lines ss ]
 
-toOp2 :: T.Text -> Maybe Operator2
-toOp2 "and"  = Just (.&.)
-toOp2 "or"   = Just (.|.)
-toOp2 "xor"  = Just xor
-toOp2 "plus" = Just (+)
-toOp2 _      = Nothing
+parseProgram :: String -> Program
+parseProgram ss = (opcs, argss) where
+  opcs  = map read $ catMaybes $ takeWhile isJust [ lookup ("opc-" ++ show i) mm | i <- [3..] ]
+  argss = chunksOf 3 $ map read $ catMaybes $ takeWhile isJust [ lookup ("arg-" ++ show i ++ "-" ++ show j) mm | i <- [3..], j <- [0..2] ]
+  mm    = parseRes ss
 
-toOp3 :: T.Text -> Maybe Operator3
-toOp3 "if0" = Just $ \c t e -> ite (c .== 0) t e
-toOp3 _     = Nothing
+toOp :: T.Text -> Maybe Opr
+toOp "not"   = Just Not
+toOp "shl1"  = Just (Shl 1)
+toOp "shr1"  = Just (Shr 1)
+toOp "shr4"  = Just (Shr 4)
+toOp "shr16" = Just (Shr 16)
+toOp "and"   = Just And
+toOp "or"    = Just Or
+toOp "xor"   = Just Xor
+toOp "plus"  = Just Plus
+toOp "if0"   = Just If0
+toOp _       = Nothing
 
 synth :: Given Token => Int -> [T.Text] -> T.Text -> IO ()
 synth size ops ident = do
   putStrLn $ "Start synthesis: " ++ show size ++ ", " ++ show ops
 
   let initNum = 4
-  is <- zipWith (\i v -> v `div` initNum * initNum + i) [0..] <$> replicateM (fromIntegral initNum) randomIO
+  -- is <- zipWith (\i v -> v `div` initNum * initNum + i) [0..] <$> replicateM (fromIntegral initNum) randomIO
+  let is = [0,1,2,4]
   os <- oracleIO ident is
 
-  let op1s = catMaybes $ map toOp1 ops
-      op2s = catMaybes $ map toOp2 ops
-      op3s = catMaybes $ map toOp3 ops
+  let oprs = catMaybes $ map toOp ops
 
   let go e = do
         putStrLn "behave..."
-        l <- behave size (filter (isJust.toOp1) ops) op1s (filter (isJust.toOp2) ops) op2s (filter (isJust.toOp3) ops) op3s e
-        putStrLn $ "found: " ++ show l
-        a <- distinct size 14 e l
+        progn <- findProgram oprs (size-1) e
+        putStrLn $ "found: " ++ show progn
+        a <- distinct oprs (size-1) e progn
         putStrLn $ "distinct: " ++ show a
         case a of
-          Nothing -> putStrLn $ "found: " ++ show l
+          Nothing -> putStrLn $ "Answer found!!: " ++ show progn
           Just f -> do
             [g] <- oracleIO ident [f]
             go ((f, g):e)
   go $ zip is os
+  undefined
 
 main :: IO ()
 main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >>= \case
@@ -236,3 +279,5 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
     TrainingProblem prog ident size ops <- train $ TrainRequest (read level) []
     putStrLn $ "Expected answer: " ++ T.unpack prog
     synth size ops ident
+  _ -> do
+    undefined

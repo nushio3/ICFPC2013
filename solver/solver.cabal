@@ -151,6 +151,8 @@ executable smt-synth
     , text
     , random
     , solver
+    , mtl
+    , split
 
   buildable: True
 
