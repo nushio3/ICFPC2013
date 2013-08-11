@@ -117,13 +117,14 @@ manufactur = do
                 $ atomically $ readTVar (evalCandidate given)
             atomically $ writeTVar (evalCandidate given) $ Map.fromAscList rest
             let es = map fst es'
-            is <- (++ es) <$> replicateM (256 - length es) randomIO
+            is <- (es++) <$> replicateM (256 - length es) randomIO
 
             API.eval (API.EvalRequest (Just $ theId given) Nothing (map (T.pack . printf "0x%016X") is)) >>= \case
                 API.EvalResponse API.EvalOk (Just os) _ -> addExample $ zip3 is (repeat 60) os
                 API.EvalResponse API.EvalError _ (Just msg) -> putStrLn (T.unpack msg)
+            putStrLn "eval: Done."
         guess = do
-            print "guess"
+            putStrLn "guess"
             gsc <- atomically $ readTVar (guessCandidate given)
             let (p, _) = maximumBy (compare `on` view _2) (Map.toList gsc)
             API.guess (API.Guess (theId given) (T.pack p)) >>= \case
@@ -132,12 +133,14 @@ manufactur = do
                 API.GuessResponse API.GuessMismatch (Just vs) _ -> do
                     addExample [(read $ T.unpack $ vs ^?! ix 0, 1000, read $ T.unpack $ vs ^?! ix 1)]
             atomically $ modifyTVar (guessCandidate given) $ at p .~ Nothing
+            putStrLn "guess:Done."
 
 addExample :: Given Environment => [(BitVector, Double, BitVector)] -> IO ()
 addExample xs = do
     forM_ xs $ \(i, w, o) -> atomically $ modifyTVar (examples given) $ at i ?~ (w, o)
-    judgement
-    removeTrivial
+    forkIO $ judgement
+    forkIO $ removeTrivial
+    return ()
     
 oracleSummoner :: (Given API.Token, Given Environment) => IO ()
 oracleSummoner = forever $ do
@@ -150,7 +153,7 @@ oracleSummoner = forever $ do
 
 trainer :: Given Environment => IO ()
 trainer = forever $ do
-    revealDistinguisher
+    forkIO $ revealDistinguisher
     threadDelay $ 6 * 1000 * 1000
 
 trainProblem :: Given API.Token => Int -> IO (T.Text, Int, [String])
@@ -178,7 +181,8 @@ main = getArgs >>= \case
                 }
         print (size, ops)
         (give env :: (Given Environment => IO ()) => IO ()) $ do
-            replicateM_ 8 $ spawn 8
+            replicateM_ 4 $ spawn 10
+            replicateM_ 4 $ spawn 19
             forkKillme trainer
             oracleSummoner
 
@@ -201,4 +205,6 @@ spawn t = forkKillme $ forever $ do
 
 z3Slayer = do
     procs <- map words <$> lines <$> readProcess "/bin/ps" [] ""
-    forM_ (map (!!0) $ filter (elem "<defunct>") procs) $ \pid -> system $ "kill " ++ pid
+    forM_ (map (!!0) $ filter (elem "<defunct>") procs) $ \pid -> do
+	putStrLn $ "kill " ++ pid
+	system $ "kill " ++ pid
