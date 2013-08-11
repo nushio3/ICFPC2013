@@ -63,11 +63,20 @@ def index(request):
     last_modified_string = time.strftime('%Y-%m-%d %H:%M:%S',
                                          time.localtime(last_modified_walltime))
     autoload_status = problems.models.GetAutoLoadStatus()
+
+    training_problems = problems.models.LoadTraining()
+    training_problems = filter(
+        lambda p: DoesIncludeAndExclude(set(p['operators']),
+                                        include_filter, exclude_filter),
+        training_problems)
+    training_problems.sort(key=bySize)
+
     context = {
         'under_solve_problems': under_solve_problems,
         'solved_problems': solved_problems,
         'dead_problems': dead_problems,
         'untouched_problems': untouched_problems,
+        'training_problems': training_problems,
         'last_modified': last_modified_string,
         'autoload_status': autoload_status,
         'with': include_word,
