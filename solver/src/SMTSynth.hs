@@ -400,7 +400,7 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
       & tfoldMode .~ ("tfold" `elem` ops')
   
   let oprs = catMaybes $ map toOp ops
-  let size = max 1 $ (ss + adj + 1 - sum (map pred $ map argNum oprs))
+  let size = max 1 $ (ss + adj - sum (map pred $ map argNum oprs))
 
   putStrLn $ "Start synthesis: " ++ T.unpack ident ++ " " ++ show ss ++ " (" ++ show size ++ "), " ++ show ops
   when isTFold $ putStrLn "TFold Mode (>_<);;"
@@ -408,7 +408,7 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
   let go es add = do
         -- putStrLn "behave..."
         putStrLn $ "inputs: " ++ show (add ++ es)
-        progn <- para cpuNum $ \i -> findProgram i myFlags oprs size $ add ++ es
+        progn <- para cpuNum $ \i -> findProgram i myFlags oprs (size + i `mod` 4) $ add ++ es
         system "pkill z3"
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram myFlags oprs progn)
         o <- oracleDistinct ident $ toProgram myFlags oprs progn
