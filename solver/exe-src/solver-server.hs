@@ -1,12 +1,14 @@
 {-# LANGUAGE OverloadedStrings, DeriveDataTypeable #-}
 
 import Control.Concurrent
+import Control.Concurrent.Async
 import Control.Monad.Trans
 import Data.Aeson.Types as JSON
 import qualified Data.Aeson as JSON
 import Data.Maybe
 import qualified Data.Text.Lazy as T
 import Network.HTTP.Types (status400)
+import System.Cmd
 import System.Console.CmdArgs.Implicit
 import Web.Scotty
 
@@ -21,11 +23,13 @@ import Z3Slayer
 data ServerOptions = ServerOptions
   { port :: Int
   , weight :: Int
+  , numCpu :: Int
   } deriving (Show, Data, Typeable)
 
 server_options = ServerOptions {
   port = 31940  &= help "port number",
-  weight = 0 &= help "debug flag to have weight"
+  weight = 0 &= help "debug flag to have weight",
+  numCpu = 1 &= help "number of cpu"
   } &= summary "solver server"
 
 {-
@@ -33,8 +37,17 @@ server_options = ServerOptions {
 --- Record and report current # of requests.
 -}
 
+para :: Int -> (Int -> IO a) -> IO a
+para n m = foldl1 rac $ map m [0..n-1] where
+  rac a b = do
+    x <- race a b
+    case x of
+      Left v -> return v
+      Right v -> return v
+
+
 main = runserver =<< cmdArgs server_options where
-  runserver (ServerOptions port weight) = scotty port $ do
+  runserver (ServerOptions port weight numcpu) = scotty port $ do
     middleware logStdoutDev
 
     -- diagnose
@@ -53,7 +66,8 @@ main = runserver =<< cmdArgs server_options where
           status status400
           json $ object ["message" .= ("Bad json request"::String)]
         Just q -> do
-          r <- liftIO $ SolverAPI.satLambda q
+          r <- liftIO $ para numcpu $ (\i -> SolverAPI.satLambda q)
+          liftIO $ system "pkill z3"
           case r of
             Nothing -> do
               status status400
