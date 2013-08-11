@@ -52,7 +52,7 @@ library
     , HTTP
     , mtl
     , vector
-    , MissingH
+
   Ghc-Options: -Wall -O2
 
 Test-Suite spec

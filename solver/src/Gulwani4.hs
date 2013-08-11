@@ -10,7 +10,7 @@ import Data.Bits
 import Debug.Trace (trace)
 import Data.Char
 import Data.Tuple (swap)
-import qualified Data.String.Utils as Str
+import  Data.List.Split (splitOn)
 import Data.List (isInfixOf, isPrefixOf, sort)
 import qualified Data.Map as Map
 import Data.SBV
@@ -220,8 +220,8 @@ parseSBVOutput outputStr = do
                          
       _               -> []
       
-    getRaw key = Str.split "-" key !! 1
-    getArgIdx key = read $ Str.split "-" key !! 2
+    getRaw key = splitOn "-" key !! 1
+    getArgIdx key = read $ splitOn "-" key !! 2
     
 phiFunc :: LVProgram -> Int -> Val -> Val -> Symbolic SBool
 phiFunc lvProg exampleIdx alpha beta = do
