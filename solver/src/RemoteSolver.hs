@@ -51,8 +51,8 @@ paraAnyJust xs = do
   fold1 pawithAsyncFold q xs $ \ do
 -}
 
-satLambdaRemote :: [String] -> SolverAPI.Input -> IO (Maybe String)
-satLambdaRemote urls input = paraAny . map callone $ urls where
+satLambdaRemoteUrls :: [String] -> SolverAPI.Input -> IO (Maybe String)
+satLambdaRemoteUrls urls input = paraAny . map callone $ urls where
   callone :: String -> IO (Maybe String)
   callone u = do
     v <- satLambdaSingleRemote u input
@@ -61,6 +61,18 @@ satLambdaRemote urls input = paraAny . map callone $ urls where
         threadDelay (30*10^6)
         return Nothing
       Just a -> return (Just a)
+
+-- TODO: read from file.
+satLambdaRemote :: SolverAPI.Input -> IO (Maybe String)
+satLambdaRemote =
+  satLambdaRemoteUrls . map (\s->"http://" ++ s ++ ":31940/solve") $ [
+    "ec2-54-213-134-138.us-west-2.compute.amazonaws.com",
+    "ec2-54-213-128-103.us-west-2.compute.amazonaws.com",
+    "ec2-54-213-132-222.us-west-2.compute.amazonaws.com",
+    "ec2-54-213-135-215.us-west-2.compute.amazonaws.com",
+    "ec2-54-213-132-147.us-west-2.compute.amazonaws.com",
+    "ec2-54-213-134-50.us-west-2.compute.amazonaws.com"
+    ]
 
 
 outputMainSingle :: IO ()
@@ -74,5 +86,10 @@ outputMainMulti = do
   let urls = ["http://localhost:10203/solve",
               "http://localhost:10204/solve",
               "http://localhost:10205/solve"]
-  p <- satLambdaRemote urls SolverAPI.sampleInput
+  p <- satLambdaRemoteUrls urls SolverAPI.sampleInput
+  print p
+
+outputMain :: IO ()
+outputMain = do
+  p <- satLambdaRemote SolverAPI.sampleInput
   print p
