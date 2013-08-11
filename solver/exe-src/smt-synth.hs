@@ -12,6 +12,7 @@ import Control.Applicative
 import Control.Monad.Trans
 import Data.List
 import Data.Function
+import System.Cmd
 import System.Timeout
 import Control.Exception
 
@@ -60,7 +61,12 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
         case emb of
           Left err -> print (err :: SomeException)
           Right mb -> do
-            when (isNothing mb) $ do
-              putStrLn "timeout poyo ('_`) tsurai..."
+            case mb of
+              Nothing -> putStrLn "timeout poyo ('_`) tsurai..."
+              Just _ -> do
+                putStrLn "toketa"
+                system "../mapssh S '(4,9)' 'killall smt-synth' | sh"
+                return ()
+
   _ -> do
     fail "invalid input ('_`)"
