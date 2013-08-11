@@ -234,6 +234,7 @@ genProgram myFlags oprs size = do
         constrain $ (opcs!! lastOpcI2) .== fromIntegral andcode
         constrain $ (argss !! lastOpcI !! 0) .== fromIntegral lastAdrI2
         constrain $ (argss !! lastOpcI2!! 0) .== 1
+        constrain $ (argss !! lastOpcI2!! 1) .== fromIntegral (lastAdrI2 - 1)
 
   return (opcs, argss, border)
 
