@@ -283,7 +283,7 @@ genProgram myFlags oprs size = do
     varColors <- sWord8s [ printf "color-%d" ln | ln <- [0::Int ..size+offs-1]]        
     forM_ (take offs varColors) $ (\c -> constrain $ c .== white)
     forM_ (drop offs varColors) $ 
-      (\c -> constrain $ c .== red ||| c.== green ||| c.==blue)
+      (\c -> constrain $ (c .== red) ||| (c.== green) ||| (c.==blue))
         
       
     let candColorThm vars = flip map argss $ \[x, y, z] ->
@@ -291,7 +291,6 @@ genProgram myFlags oprs size = do
               vx = var x
               vy = var y
               vz = var z
-              vx0 = vx .== 0
           in flip map oprs $ \opr -> case opr of
             Not   -> vx
             Shl n -> vx 
@@ -303,12 +302,8 @@ genProgram myFlags oprs size = do
             If0   -> ite (vx.==red &&& vy.==green &&& vz.==blue) red black      
     
     forM_ (zip3 [offs..] (candColorThm varColors) opcs) $ \(ln, candThms, opc) ->
-        constrain $ (varColors !! ln) `darker` (select candThms 0 opc)
+         constrain $ (varColors !! ln) `darker` (select candThms 0 opc)
 
-
-    constrain $ varColors !! lastAdrI2 .== red
-    constrain $ varColors !! lastAdrI  .== blue
-    
     
     case findIndex (==If0) oprs of
       Nothing ->  error "Bonus problem without If0 \\(>_<)/"  
@@ -354,7 +349,7 @@ findProgram seed myFlags oprs size samples = do
   -- generateSMTBenchmarks True "find" c
   res <- satWith (z3 {solver=(solver z3) {options=options (solver z3) ++ ["smt.random_seed="++show seed]}}) c
   
-  print res
+  -- print res
   return $ parseProgram (myFlags^.tfoldMode) $ show res
 
 type Program  = ([Loc],  [[Loc]])
@@ -433,7 +428,7 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
       & tfoldMode .~ ("tfold" `elem` ops')
   
   let oprs = catMaybes $ map toOp ops
-  let size = max 1 $ (ss + adj - sum (map pred $ map argNum oprs))
+  let size = (max 1 $ (ss + adj - sum (map pred $ map argNum oprs)))
 
   putStrLn $ "Start synthesis: " ++ T.unpack ident ++ " " ++ show ss ++ " (" ++ show size ++ "), " ++ show ops
   when isTFold $ putStrLn "TFold Mode (>_<);;"
