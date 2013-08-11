@@ -13,8 +13,8 @@ import Web.Scotty
 -- install wai-extra if you don't have this
 import Network.Wai.Middleware.RequestLogger
 
-import Gulwani4
 import SolverAPI
+import Z3Slayer
 
 -- Port: port to listen.
 -- weight: sec to sleep before handling request. Pure debug purpose.
@@ -38,10 +38,14 @@ main = runserver =<< cmdArgs server_options where
     middleware logStdoutDev
 
     -- diagnose
-    get "/" $ text "foobar"
+    get "/" $ do
+      liftIO z3Slayer  -- kill stale defuncts
+      text "foobar"
 
     post "/solve" $ do
+      -- debug operation.
       liftIO $ threadDelay (weight * 1000 * 1000)
+      liftIO $ z3Slayer  -- kill stale defuncts
       b <- body
       -- I forgot how to handle maybe around here. Plz get rid of those stupid cases.
       case (JSON.decode b :: Maybe SolverAPI.Input) of
