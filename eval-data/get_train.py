@@ -16,14 +16,17 @@ def Parse():
     parser.add_argument('--previous_input')
     parser.add_argument('--sleep', type=int, default=5)
     parser.add_argument('-n', type=int, default=1)
+    parser.add_argument('--operators', default=None)
     return parser.parse_args()
 
 
-def GetTraining(size):
+def GetTraining(size, operators):
     url = ('http://icfpc2013.cloudapp.net/train?auth=%svpsH1H' %
            '0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0Kj')
     
     query = {'size': size}
+    if operators is not None:
+        query['operators'] = [operators]
     query_string = json.dumps(query)
     urlin = urllib2.urlopen(url, query_string)
     a_string = urlin.read()
@@ -41,7 +44,7 @@ def main(argv):
         fin.close()
     for i in xrange(flags.n):
         try:
-            result.append(GetTraining(flags.size))
+            result.append(GetTraining(flags.size, flags.operators))
         except urllib2.HTTPError, e:
             sys.stderr.write('error: ' + str(e) + '\n')
         time.sleep(flags.sleep)
