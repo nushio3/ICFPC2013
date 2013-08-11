@@ -54,81 +54,12 @@ oracleDistinct ident p = do
         fail "tsurapoyo('_`)"
     GuessError -> fail $ show gmsg
 
---valid :: [SWord8] -> SBool
---valid oprs = go 0 oprs (0 :: SInt8) where
---  go _ [] s = s .== 1
---  go xx (opr:rest) s = ite (s .< xx) false $ go 1 rest (select rs 0 opr) where
---    rs =
---      [ s
---      , s + 1, s + 1, s + 1
---      , s - 2
---      , s, s, s, s, s
---      , s - 1, s - 1, s - 1, s - 1
---      ]
-
---interp :: [SWord8] -> SWord64 -> SWord64
---interp oprs i = go oprs $ replicate maxlen 0 where
---  maxlen = length oprs
---  go [] (v:_) = v
---  go (opr:rest) ss = ite (opr .== $ go rest $
---    ite (opr .== 1 ) (take maxlen $ 0:ss) $ -- const 0
---    ite (opr .== 2 ) (take maxlen $ 1:ss) $ -- const 1
---    ite (opr .== 3 ) (take maxlen $ i:ss) $ -- var
---    ite (opr .== 4 ) ((case splitAt 3 ss of ([c,t,e], sss) -> ite (c.==0) t e:sss++[0,0]; _ -> ss)) $ -- if0
---    ite (opr .== 5 ) ((case splitAt 1 ss of ([x], sss) -> complement x:sss; _ -> ss)) $ -- not
---    ite (opr .== 6 ) ((case splitAt 1 ss of ([x], sss) -> x `shiftL` 1:sss; _ -> ss)) $ -- shl1
---    ite (opr .== 7 ) ((case splitAt 1 ss of ([x], sss) -> x `shiftR` 1:sss; _ -> ss)) $ -- shr1
---    ite (opr .== 8 ) ((case splitAt 1 ss of ([x], sss) -> x `shiftR` 4:sss; _ -> ss)) $ -- shr4
---    ite (opr .== 9 ) ((case splitAt 1 ss of ([x], sss) -> x `shiftR` 16:sss; _ -> ss)) $ -- shr16
---    ite (opr .== 10) ((case splitAt 2 ss of ([x, y], sss) -> (x .&. y) : sss++[0]; _ -> ss)) $ -- and
---    ite (opr .== 11) ((case splitAt 2 ss of ([x, y], sss) -> (x .|. y) : sss++[0]; _ -> ss)) $ -- or
---    ite (opr .== 12) ((case splitAt 2 ss of ([x, y], sss) -> (x `xor` y) : sss++[0]; _ -> ss)) $ -- xor
---    ite (opr .== 13) ((case splitAt 2 ss of ([x, y], sss) -> (x + y) : sss++[0]; _ -> ss)) $ -- plus
---    ss
-
---behave :: Int -> Int -> [(Word64, Word64)] -> IO [Word8]
---behave size opc samples = do
---  generateSMTBenchmarks True "test" $ do
---    oprs <- mkExistVars size
---    mapM_ (\opr -> constrain $ opr .<= 13) oprs
---    constrain $ valid oprs
---    mapM_ (\(i, o) -> constrain $ interp oprs (literal i) .== literal o) samples
---    return (true :: SBool)
---  fail "hoge"
-
---  ret <- sat $ do
---    oprs <- mkExistVars size
---    mapM_ (\opr -> constrain $ opr .<= 13) oprs
---    constrain $ valid oprs
---    mapM_ (\(i, o) -> constrain $ interp oprs (literal i) .== literal o) samples
---    return (true :: SBool)
---  case getModel ret of
---    Right (_, v) -> return v
---    Left err -> fail err
-
---distinct :: Int -> Int -> [(Word64, Word64)] -> [Word8] -> IO (Maybe Word64)
---distinct size opc samples l = do
---  ret <- sat $ do
---    oprs <- mkExistVars size
---    mapM_ (\opr -> constrain $ opr .<= 13) oprs
---    constrain $ valid oprs
---    mapM_ (\(i, o) -> constrain $ interp oprs (literal i) .== literal o) samples
---    i <- exists_
---    constrain $ interp oprs i ./= interp (map literal l) i
---    return (true :: SBool)
---  case getModel ret of
---    Right (_, v) -> return $ Just v
---    Left _ -> return Nothing
-
 instance Applicative Symbolic where
   pure = return
   a <*> b = do
     f <- a
     x <- b
     return $ f x
-
---type Addr = SWord16
---type Val = SWord64
 
 data Opr = If0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus 
   deriving (Eq, Show)
@@ -143,42 +74,6 @@ argNum opr = case opr of
   Or    -> 2
   Xor   -> 2
   Plus  -> 2
-
---data Alloc a = Alloc { _aOut :: a, _aArg :: [a] }
-
---allocs :: Alloc a -> [a]
---allocs (Alloc a is) = a : is
-
---behave :: [Opr]
---       -> [Alloc Addr]
---       -> [(Word64, Word64)]
---       -> Symbolic SBool
---behave oprs locs samples = do
---  forM_ samples $ \(i, o) ->
---    phiFunc i o
---  return true
-
---  where
---    len = length oprs
-
---    phiFunc :: Word64 -> Word64 -> Symbolic ()
---    phiFunc i o = do
---      vars@(v0:v1:v2:_) <- mapM (mkAlloc $ sWord64 "var") oprs
---      constrain $ _aOut v0 .== 0
---      constrain $ _aOut v1 .== 1
---      constrain $ _aOut v2 .== literal i
---      forM_ (zip locs vars) $ \(loc, var) -> do
---        constrain $ ite (_aOut loc .== literal (fromIntegral len - 1)) (_aOut var .== literal o) true
---      forM_ (zip oprs vars) $ \(opr, var) ->
---        constrain $ oprSat opr var
-
---      let as = zip (concatMap allocs locs) (concatMap allocs vars)
---      liftIO $ print $ length as
---      let conss = [ (a .== c) ==> (b .== d)
---                  | (i, (a, b)) <- zip [0..] as
---                  , (j, (c, d)) <- zip [0..] as
---                  , i < j ]
---      mapM_ constrain conss
 
 type SLoc = SWord8
 type Loc = Word8
@@ -248,14 +143,13 @@ genProgram myFlags oprs size = do
   -- (if0 0 _) and (if0 1 _) is redundant
   opid If0 $ \i j k -> i ./= 0 &&& i ./= 1 &&& j .< k
 
-  -- (and 0 _) (and _ 0)
-  -- (and c c)
+  -- (and 0 _) (and _ 0) (and c c)
   opid And $ \i j k -> i ./= 0 &&& j ./= 0 &&& (i .> 1 ||| j .> 1) &&& i .< j
 
-  -- (or 0 _) and (or _ 0)
+  -- (or 0 _) (or _ 0) (or c c)
   opid Or  $ \i j k -> i ./= 0 &&& j ./= 0 &&& (i .> 1 ||| j .> 1) &&& i .< j
 
-  -- (xor 0 _) and (xor _ 0)
+  -- (xor 0 _) (xor _ 0) (xor c c)
   opid Xor $ \i j k -> i ./= 0 &&& j ./= 0 &&& (i .> 1 ||| j .> 1) &&& i .< j
 
   -- (plus 0 _) (plus _ 0) (plus i j) i >= j
@@ -434,10 +328,12 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
   putStrLn $ "Start synthesis: " ++ T.unpack ident ++ " " ++ show ss ++ " (" ++ show size ++ "), " ++ show ops
   when isTFold $ putStrLn "TFold Mode (>_<);;"
 
+  seeds <- replicateM cpuNum randomIO
+
   let go es = do
         -- putStrLn "behave..."
         putStrLn $ "inputs: " ++ show es
-        progn <- para cpuNum $ \i -> findProgram i myFlags oprs (size + i `mod` 3) $ take 5 es
+        progn <- para cpuNum $ \i -> findProgram ((abs $ seeds !! 1)`mod`65536) myFlags oprs (size + i `mod` 3) $ take 5 es
         system "pkill z3"
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram myFlags oprs progn)
         o <- oracleDistinct ident $ toProgram myFlags oprs progn
