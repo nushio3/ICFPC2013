@@ -98,6 +98,11 @@ remainingTime = do
     t <- getCurrentTime
     return $ 60 * 5 - realToFrac (diffUTCTime t (startTime given))
 
+tooLarge :: Int -> [a] -> Bool
+tooLarge 0 (_:xs) = False
+tooLarge n (_:xs) = tooLarge (n - 1) xs
+tooLarge n [] = True
+
 manufactur :: (Given API.Token, Given Environment) => IO ()
 manufactur = do
     t <- remainingTime
@@ -120,20 +125,21 @@ manufactur = do
             is <- (es++) <$> replicateM (256 - length es) randomIO
 
             API.eval (API.EvalRequest (Just $ theId given) Nothing (map (T.pack . printf "0x%016X") is)) >>= \case
-                API.EvalResponse API.EvalOk (Just os) _ -> addExample $ zip3 is (repeat 60) os
+                API.EvalResponse API.EvalOk (Just os) _ -> addExample $ zip3 is (replicate (length es)  xs) os
                 API.EvalResponse API.EvalError _ (Just msg) -> putStrLn (T.unpack msg)
             putStrLn "eval: Done."
         guess = do
             putStrLn "guess"
             gsc <- atomically $ readTVar (guessCandidate given)
             let (p, _) = maximumBy (compare `on` view _2) (Map.toList gsc)
-            API.guess (API.Guess (theId given) (T.pack p)) >>= \case
-                API.GuessResponse API.GuessWin _ _ -> putStrLn "Won!" >> kill'em_all >> exitSuccess
-                API.GuessResponse API.GuessError _ (Just msg) -> putStrLn (T.unpack msg) >> kill'em_all >> exitSuccess
-                API.GuessResponse API.GuessMismatch (Just vs) _ -> do
-                    addExample [(read $ T.unpack $ vs ^?! ix 0, 1000, read $ T.unpack $ vs ^?! ix 1)]
-            atomically $ modifyTVar (guessCandidate given) $ at p .~ Nothing
-            putStrLn "guess:Done."
+            when (tooLarge p 1000) $ do
+                API.guess (API.Guess (theId given) (T.pack p)) >>= \case
+                    API.GuessResponse API.GuessWin _ _ -> putStrLn "Won!" >> kill'em_all >> exitSuccess
+                    API.GuessResponse API.GuessError _ (Just msg) -> putStrLn (T.unpack msg) >> kill'em_all >> exitSuccess
+                    API.GuessResponse API.GuessMismatch (Just vs) _ -> do
+                        addExample [(read $ T.unpack $ vs ^?! ix 0, 1000, read $ T.unpack $ vs ^?! ix 1)]
+                atomically $ modifyTVar (guessCandidate given) $ at p .~ Nothing
+                putStrLn "guess:Done."
 
 addExample :: Given Environment => [(BitVector, Double, BitVector)] -> IO ()
 addExample xs = do
