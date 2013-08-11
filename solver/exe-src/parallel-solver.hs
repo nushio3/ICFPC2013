@@ -113,8 +113,10 @@ manufactur = do
     where
         eval = do
             print "eval"
-            (es, rest) <- fmap (splitAt 256 . map fst . sortBy (flip (compare `on` view _2)) . Map.toList)
+            (es', rest) <- fmap (splitAt 256 . sortBy (flip (compare `on` view _2)) . Map.toList)
                 $ atomically $ readTVar (evalCandidate given)
+            atomically $ writeTVar (evalCandidate given) $ Map.fromAscList rest
+            let es = map fst es'
             is <- (++ es) <$> replicateM (256 - length es) randomIO
 
             API.eval (API.EvalRequest (Just $ theId given) Nothing (map (T.pack . printf "0x%016X") is)) >>= \case
@@ -197,5 +199,5 @@ spawn t = forkKillme $ forever $ do
         Just _ -> return ()
 
 z3Slayer = do
-    procs <- map words <$> lines <$> readProcess "/usr/bin/ps" [] ""
+    procs <- map words <$> lines <$> readProcess "/bin/ps" [] ""
     forM_ (map (!!0) $ filter (elem "<defunct>") procs) $ \pid -> system $ "kill -9" ++ pid
