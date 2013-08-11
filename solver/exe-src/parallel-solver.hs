@@ -142,7 +142,7 @@ manufactur = do
             let (p, _) = maximumBy (compare `on` view _2) (Map.toList gsc)
             when (notTooLarge 1000 p) $ do
                 putStrLn "************************************"
-                putStrLn $ "     guess " ++ 
+                putStrLn $ "     guess " ++ p
                 putStrLn "************************************"
                 API.guess (API.Guess (theId given) (T.pack p)) >>= \case
                     API.GuessResponse API.GuessWin _ _ -> do
