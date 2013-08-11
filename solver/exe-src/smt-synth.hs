@@ -33,6 +33,7 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
       Just p  -> synth (read cpu) (problemSize p) (problemOperators p) (problemId p)
       Nothing -> fail "No such problem"
   ("auto": cpu:flds) -> do
+    system "cd ..; ./mapssh S '(4,9)' 'killall smt-synth' | sh"
     putStrLn "You start automatic solving mode, really?"
     "y" <- getLine
     allProblems <- myproblems
@@ -65,7 +66,7 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
               Nothing -> putStrLn "timeout poyo ('_`) tsurai..."
               Just _ -> do
                 putStrLn "toketa"
-                system "../mapssh S '(4,9)' 'killall smt-synth' | sh"
+                system "cd ..; ./mapssh S '(4,9)' 'killall smt-synth' | sh"
                 return ()
 
   _ -> do
