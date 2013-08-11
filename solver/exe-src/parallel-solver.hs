@@ -29,6 +29,7 @@ import Network.HTTP.Conduit
 import qualified RemoteSolver
 import Z3Slayer
 import SMTSynth hiding (Program)
+import qualified WrapSMTSynth
 
 data Environment = Environment
     { examples :: TVar (Map.Map BitVector (Double, BitVector))
@@ -51,6 +52,7 @@ genLambda :: Given Environment => Double -> IO ()
 genLambda t = do
     atomically (readTVar (examples given)) >>= head (theSatLambdas given) (t * strictness given) >>= \case
         Just p -> do
+            putStrLn p
             let prog = enrichProgram $ readProgram p
             findCounterExamples prog >>= \case
                 [] -> do
@@ -193,7 +195,7 @@ solveAndAnswer ident size ops w ratio = do
             , startTime = t
             , theId = ident
             , strictness = ratio
-            , theSatLambdas = [RemoteSolver.satLambdaRemote flags size ops]
+            , theSatLambdas = [WrapSMTSynth.satLambda flags size ops]
             , _DEATH_NOTE = deathNote
             }
     print (size, ops)
