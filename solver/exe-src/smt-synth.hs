@@ -30,10 +30,23 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
     case find (\p -> problemId p == T.pack tid) problems of
       Just p  -> synth (read cpu) (problemSize p) (problemOperators p) (problemId p)
       Nothing -> fail "No such problem"
-  ["auto", cpu] -> do
+  ("auto": cpu:flds) -> do
     putStrLn "You start automatic solving mode, really?"
     "y" <- getLine
-    problems <- myproblems
+    allProblems <- myproblems
+
+    let problems = 
+          (if ("bonus"`elem`flds) then filter isBonusProb else id) $
+          (if ("tfold"`elem`flds) then filter isTFoldProb else id) $
+          (if ("fold"`elem`flds) then filter isFoldProb else id) $
+          (if ("nobonus"`elem`flds) then filter (not.isBonusProb) else id) $
+          (if ("notfold"`elem`flds) then filter (not.isTFoldProb) else id) $
+          (if ("nofold"`elem`flds) then filter (not.isFoldProb) else id) $
+          allProblems
+        isBonusProb = elem "bonus". problemOperators
+        isTFoldProb = elem "tfold". problemOperators
+        isFoldProb = elem "fold". problemOperators
+
     forM_ (sortBy (compare `on` problemSize) problems) $ \p -> do
       when (isSolved p /= Just True && timeLeft p /= Just 0) $ do
         synth (read cpu) (problemSize p) (problemOperators p) (problemId p)
