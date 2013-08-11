@@ -31,6 +31,7 @@ library
     StupidSat
     WrapSMTSynth
     SolverAPI
+    Z3Slayer
 
 
   hs-source-dirs:    src/  
@@ -258,4 +259,8 @@ executable solver-api-server
     , http-types
     , text
     , mtl
+<<<<<<< HEAD
   buildable: False
+=======
+  buildable: False
+>>>>>>> 22313fe32109c9ce1cf5e2bb42d20ef8f34c41f7
