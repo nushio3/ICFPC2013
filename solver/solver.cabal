@@ -25,7 +25,8 @@ library
     API
     Database
 
-    Gulwani2
+    GulwaniHead
+    Gulwani4
 
 
   hs-source-dirs:    src/  
@@ -49,6 +50,7 @@ library
     , reflection
     , http-conduit
     , mtl
+    , vector
   Ghc-Options: -Wall -O2
 
 Test-Suite spec
