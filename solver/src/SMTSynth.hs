@@ -1,9 +1,8 @@
 {-# LANGUAGE LambdaCase, FlexibleContexts, OverloadedStrings #-}
 module SMTSynth where
 
-
 import Data.SBV
--- import System.Random
+import System.Random
 import Control.Monad
 import Data.Reflection
 import qualified Data.Text as T
@@ -218,22 +217,22 @@ genProgram oprs size = do
   opid If0 $ \i j k -> i ./= 0 &&& i ./= 1 &&& j .< k
 
   -- (and 0 _) and (and _ 0)
-  opid And $ \i j _ -> i ./= 0 &&& j ./= 0 &&& i .< j
+  opid And $ \i j k -> i ./= 0 &&& j ./= 0 &&& i .< j
 
   -- (or 0 _) and (or _ 0)
-  opid Or  $ \i j _ -> i ./= 0 &&& j ./= 0 &&& i .< j
+  opid Or  $ \i j k -> i ./= 0 &&& j ./= 0 &&& i .< j
 
   -- (xor 0 _) and (xor _ 0)
-  opid Xor $ \i j _ -> i ./= 0 &&& j ./= 0 &&& i .< j
-
-  -- (shxx 0) (shrx 1)
-  opid (Shl 1)  $ \i _ _ -> i ./= 0
-  opid (Shr 1)  $ \i _ _ -> i ./= 0 &&& i ./= 1
-  opid (Shr 4)  $ \i _ _ -> i ./= 0 &&& i ./= 1
-  opid (Shr 16) $ \i _ _ -> i ./= 0 &&& i ./= 1
+  opid Xor $ \i j k -> i ./= 0 &&& j ./= 0 &&& i .< j
 
   -- (plus 0 _) (plus _ 0) (plus i j) i >= j
-  opid Plus $ \i j _ -> i ./= 0 &&& j ./= 0 &&& i .<= j
+  opid Plus $ \i j k -> i ./= 0 &&& j ./= 0 &&& i .<= j
+
+  -- (shxx 0) (shrx 1)
+  opid (Shl 1)  $ \i j k -> i ./= 0
+  opid (Shr 1)  $ \i j k -> i ./= 0 &&& i ./= 1
+  opid (Shr 4)  $ \i j k -> i ./= 0 &&& i ./= 1
+  opid (Shr 16) $ \i j k -> i ./= 0 &&& i ./= 1
 
   return (opcs, argss)
 
@@ -313,11 +312,14 @@ toProgram oprs (opcs, argss) = BV.Program $ last ls where
 
 synth :: Given Token => Int -> [T.Text] -> T.Text -> IO ()
 synth ss ops ident = if "fold" `elem` ops || "tfold" `elem` ops then putStrLn "I can not use fold (>_<)" else do
-  let is = [0, 1]
+  i0 <- randomIO
+  i1 <- randomIO
+
+  let is = (i1 .|. 1) : (i0 .&. (complement 1)) : []
   os <- oracleIO ident is
 
   let oprs = catMaybes $ map toOp ops
-  let size = max 1 $ ss - 2 -- - sum (map pred $ map argNum oprs)
+  let size = max 1 $ ss - 2 - sum (map pred $ map argNum oprs) + 2
 
   putStrLn $ "Start synthesis: " ++ T.unpack ident ++ " " ++ show ss ++ " (" ++ show size ++ "), " ++ show ops
 
