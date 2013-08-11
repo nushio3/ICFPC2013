@@ -430,7 +430,7 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
   
   let oprs = catMaybes $ map toOp ops
   let size = (max 1 $ (ss + adj - sum (map pred $ map argNum oprs)))
-
+       + (if myFlags ^. bonusMode then 0 else 0)
   putStrLn $ "Start synthesis: " ++ T.unpack ident ++ " " ++ show ss ++ " (" ++ show size ++ "), " ++ show ops
   when isTFold $ putStrLn "TFold Mode (>_<);;"
 
@@ -444,7 +444,9 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
         case o of
           Nothing -> do
             putStrLn "Accepted: yatapo-(^_^)!"
-            system "wget http://botis.org:9999/play/VEC1%20FX%20081.wav -O /dev/null"
+            if (myFlags ^. bonusMode)
+               then system "wget http://botis.org:9999/play/AC.wav -O /dev/null"
+               else system "wget http://botis.org:9999/play/meow.wav -O /dev/null"
             return ()
           Just oo -> do
             putStrLn $ "distinct: " ++ show oo
