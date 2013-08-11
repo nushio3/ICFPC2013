@@ -14,7 +14,7 @@ def bySize(p):
     return (p['size'], len(p['operators']), ','.join(p['operators']), p['id'])
 
 def isSolved(p):
-    return 'solved' in p
+    return p.get('solved', False)
 
 def getTimeLeft(p):
     return p.get('timeLeft', 300)

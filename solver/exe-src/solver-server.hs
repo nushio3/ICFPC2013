@@ -24,7 +24,7 @@ data ServerOptions = ServerOptions
   } deriving (Show, Data, Typeable)
 
 server_options = ServerOptions {
-  port = 10203  &= help "port number",
+  port = 31940  &= help "port number",
   weight = 0 &= help "debug flag to have weight"
   } &= summary "solver server"
 
@@ -36,6 +36,9 @@ server_options = ServerOptions {
 main = runserver =<< cmdArgs server_options where
   runserver (ServerOptions port weight) = scotty port $ do
     middleware logStdoutDev
+
+    -- diagnose
+    get "/" $ text "foobar"
 
     post "/solve" $ do
       liftIO $ threadDelay (weight * 1000 * 1000)

@@ -252,6 +252,7 @@ executable solver-api-server
     base==4.*
     , aeson
     , bytestring
+    , cmdargs
     , solver
     , scotty
     , resourcet
@@ -260,5 +261,5 @@ executable solver-api-server
     , text
     , mtl
 
-  buildable: False
+  buildable: True
 

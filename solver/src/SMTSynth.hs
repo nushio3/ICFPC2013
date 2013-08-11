@@ -226,11 +226,11 @@ genProgram myFlags oprs size = do
   opcs <- sWord8s [ printf "opc-%d" i | i <- take size [offs ..] ]
   constrain $ bAll (`inRange` (0, fromIntegral $ length oprs-1)) opcs
 
-  let costs = map (literal . fromIntegral . argNum) oprs
+  --let costs = map (literal . fromIntegral . argNum) oprs
 
-  b <- liftIO $ randomIO
-  when b $
-    constrain $ sum [ select costs (1 :: SInt8) opc | opc <- opcs ] - (literal $ fromIntegral $ length oprs) .<= (literal $ fromIntegral size)
+  --b <- liftIO $ randomIO
+  --when b $
+  --  constrain $ sum [ select costs (1 :: SInt8) opc | opc <- opcs ] - (literal $ fromIntegral $ length oprs) .<= (literal $ fromIntegral size)
 
   argss <- forM (take size [offs ..]) $ \ln -> do
     args <- sWord8s [ printf "arg-%d-%d" ln i | i <- [0::Int ..2] ]
@@ -267,17 +267,58 @@ genProgram myFlags oprs size = do
   opid (Shr 4)  $ \i j k -> i ./= 0 &&& i ./= 1
   opid (Shr 16) $ \i j k -> i ./= 0 &&& i ./= 1
 
-  when (myFlags ^. bonusMode) $ trace (printf "Bonus\\(^o^)/ size:%d\n" size) $ do
+  when (myFlags ^. bonusMode) $ do
+    forM_ [offs .. size+offs-1] $ \instAddr -> do
+      let weakSum :: SWord8 -> SWord8 -> SWord8
+          weakSum x y = 
+            ite (x.==0 &&& y.==0) 0
+              (ite (x.==0 &&& y.==1 ||| x.==1 &&& y.==0) 1 2)
+      constrain $  
+        (.<2) $
+        foldr1 weakSum $
+        map (\x -> ite (x.==fromIntegral instAddr) 1 0) $ 
+        concat argss
+
     let lastOpcI  = length opcs - 1
         lastOpcI2 = length opcs - 2
         
         lastAdrI  = length opcs - 1 + offs
         lastAdrI2 = length opcs - 2 + offs
         
-    let red   = 0 :: SWord8
-        green = 1 :: SWord8
-        blue  = 2 :: SWord8
+    {-
+    let    
+        white = 0 :: SWord8
+        red   = 1 :: SWord8
+        green = 2 :: SWord8
+        blue  = 4 :: SWord8
+        black = 15 :: SWord8 
         
+        darker a b = a .&. b .== b
+    varColors <- sWord8s [ printf "color-%d" ln | ln <- [0::Int ..size+offs-1]]        
+    forM_ (take offs varColors) $ (\c -> constrain $ c .== white)
+    forM_ (drop offs varColors) $ 
+      (\c -> constrain $ (c .== red) ||| (c.== green) ||| (c.==blue))
+        
+      
+    let candColorThm vars = flip map argss $ \[x, y, z] ->
+          let var ix = select varColors 0 ix
+              vx = var x
+              vy = var y
+              vz = var z
+          in flip map oprs $ \opr -> case opr of
+            Not   -> vx
+            Shl n -> vx 
+            Shr n -> vx 
+            And   -> vx .|. vy
+            Or    -> vx .|. vy
+            Xor   -> vx .|. vy
+            Plus  -> vx .|. vy
+            If0   -> ite (vx.==red &&& vy.==green &&& vz.==blue) red black      
+    
+    forM_ (zip3 [offs..] (candColorThm varColors) opcs) $ \(ln, candThms, opc) ->
+         constrain $ (varColors !! ln) `darker` (select candThms 0 opc)
+-}
+    
     case findIndex (==If0) oprs of
       Nothing ->  error "Bonus problem without If0 \\(>_<)/"  
       Just ifcode ->    
@@ -321,6 +362,7 @@ findProgram seed myFlags oprs size samples = do
         return (true :: SBool)
   -- generateSMTBenchmarks True "find" c
   res <- satWith (z3 {solver=(solver z3) {options=options (solver z3) ++ ["smt.random_seed="++show seed]}}) c
+  
   -- print res
   return $ parseProgram (myFlags^.tfoldMode) $ show res
 
@@ -400,22 +442,24 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
       & tfoldMode .~ ("tfold" `elem` ops')
   
   let oprs = catMaybes $ map toOp ops
-  let size = max 1 $ (ss + adj - sum (map pred $ map argNum oprs))
-
+  let size = (max 1 $ (ss + adj - sum (map pred $ map argNum oprs)))
+       + (if myFlags ^. bonusMode then 10 else 0)
   putStrLn $ "Start synthesis: " ++ T.unpack ident ++ " " ++ show ss ++ " (" ++ show size ++ "), " ++ show ops
   when isTFold $ putStrLn "TFold Mode (>_<);;"
 
   let go es = do
         -- putStrLn "behave..."
         putStrLn $ "inputs: " ++ show es
-        progn <- para cpuNum $ \i -> findProgram i myFlags oprs (size + i `mod` 4) $ take 5 es
+        progn <- para cpuNum $ \i -> findProgram i myFlags oprs (size + i `mod` 3) $ take 5 es
         system "pkill z3"
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram myFlags oprs progn)
         o <- oracleDistinct ident $ toProgram myFlags oprs progn
         case o of
           Nothing -> do
             putStrLn "Accepted: yatapo-(^_^)!"
-            system "wget http://botis.org:9999/play/VEC1%20FX%20081.wav -O /dev/null"
+            if (myFlags ^. bonusMode)
+               then system "wget http://botis.org:9999/play/AC.wav -O /dev/null"
+               else system "wget http://botis.org:9999/play/meow.wav -O /dev/null"
             return ()
           Just oo -> do
             putStrLn $ "distinct: " ++ show oo
