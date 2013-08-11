@@ -34,8 +34,6 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
       Nothing -> fail "No such problem"
   ("auto": cpu:flds) -> do
     -- system "cd ..; ./mapssh S '(4,9)' 'killall smt-synth' | sh"
-    putStrLn "You start automatic solving mode, really?"
-    "y" <- getLine
     allProblems0 <- myproblems
 
 
