@@ -204,28 +204,16 @@ behave myFlags oprs size opcs argss i o = do
 
   if not $ myFlags^.tfoldMode
     then do
-      vars <- sWord64s [ printf "var-%d" ln | ln <- [0::Int ..size+offs-1]]
-
-      constrain $ (vars !! 0) .== 0
-      constrain $ (vars !! 1) .== 1
-      constrain $ (vars !! 2) .== i
+      vars <- ([0,1,i]++) <$> sWord64s [ printf "var-%d" ln | ln <- [0::Int ..size-1]]
       constrain $ last vars   .== o
-
       forM_ (zip3 [offs..] (candss vars) opcs) $ \(ln, cands, opc) ->
         constrain $ vars !! ln .== select cands 0 opc
     else do
       let go [] acc = constrain $ acc .== o
           go (x:xs) acc = do
-            vars <- sWord64s [ printf "var-%d" ln | ln <- [0::Int ..size+offs-1]]
-
-            constrain $ (vars !! 0) .== 0
-            constrain $ (vars !! 1) .== 1
-            constrain $ (vars !! 2) .== x
-            constrain $ (vars !! 3) .== acc
-
+            vars <- ([0,1,x,acc]++) <$> sWord64s [ printf "var-%d" ln | ln <- [0::Int ..size-1]]
             forM_ (zip3 [offs..] (candss vars) opcs) $ \(ln, cands, opc) ->
               constrain $ vars !! ln .== select cands 0 opc
-
             go xs (last vars)
 
       go [ (i `shiftR` (8*s)) .&. 0xff | s <- [0..7]] 0
