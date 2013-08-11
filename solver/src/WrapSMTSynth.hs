@@ -11,7 +11,7 @@ import RichBV
 
 satLambda :: Int -> [String] -> Double -> Map.Map BitVector (Double, BitVector) -> IO (Maybe String)
 satLambda size ops t example = do
-    let ops' = map (fromJust . SMTSynth.toOp . T.pack) ops
+    let ops' = catMaybes $ map (SMTSynth.toOp . T.pack) ops
     exs <- sampleExample (floor $ max 2 $ t / fromIntegral (length ops * size)) example
     r <- try $ findProgram ops' size exs :: IO (Either IOException SMTSynth.Program)
     
