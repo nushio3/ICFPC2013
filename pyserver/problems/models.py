@@ -17,8 +17,14 @@ def GetModelTimestamp():
 def GetModelFilename():
     return os.environ.get('ICFPC2013PROBLEMS', '../myproblems.json')
 
+def GetTrainingFilename():
+    return os.environ.get('ICFPC2013TRAINING', '../training.json')
+
 def loadModel():
     return loadModelFromFile(GetModelFilename())
+
+def LoadTraining():
+    return loadModelFromFile(GetTrainingFilename())
 
 AUTOLOAD_ENVIRONMENT = 'ICFPC2013AUTOLOAD'
 
