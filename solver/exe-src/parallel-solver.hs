@@ -86,8 +86,8 @@ revealDistinguisher = do
         b = ps !! j
     equivNeq (enrichProgram $ readProgram $ fst a) (enrichProgram $ readProgram $ fst b) >>= \case 
         Just counter -> do
-            atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 1
-            atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 1
+            atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 70
+            atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 70
         Nothing -> do
             if snd a < snd b
                 then atomically $ modifyTVar' (guessCandidate given) $ at (fst a) .~ Nothing
@@ -97,6 +97,11 @@ remainingTime :: Given Environment => IO Double
 remainingTime = do
     t <- getCurrentTime
     return $ 60 * 5 - realToFrac (diffUTCTime t (startTime given))
+
+tooLarge :: Int -> [a] -> Bool
+tooLarge 0 (_:xs) = False
+tooLarge n (_:xs) = tooLarge (n - 1) xs
+tooLarge n [] = True
 
 manufactur :: (Given API.Token, Given Environment) => IO ()
 manufactur = do
@@ -113,34 +118,38 @@ manufactur = do
     where
         eval = do
             print "eval"
-            (es', rest) <- fmap (splitAt 256 . sortBy (flip (compare `on` view _2)) . Map.toList)
+            es' <- fmap (take 256 . sortBy (flip (compare `on` view _2)) . Map.toList)
                 $ atomically $ readTVar (evalCandidate given)
-            atomically $ writeTVar (evalCandidate given) $ Map.fromAscList rest
             let es = map fst es'
-            is <- (++ es) <$> replicateM (256 - length es) randomIO
+            is <- (es++) <$> replicateM (256 - length es) randomIO
 
             API.eval (API.EvalRequest (Just $ theId given) Nothing (map (T.pack . printf "0x%016X") is)) >>= \case
-                API.EvalResponse API.EvalOk (Just os) _ -> addExample $ zip3 is (repeat 60) os
+                API.EvalResponse API.EvalOk (Just os) _ -> addExample $ zip3 is (replicate (length es) 70 ++ repeat 60) os
                 API.EvalResponse API.EvalError _ (Just msg) -> putStrLn (T.unpack msg)
+            putStrLn "eval: Done."
         guess = do
-            print "guess"
+            putStrLn "guess"
             gsc <- atomically $ readTVar (guessCandidate given)
             let (p, _) = maximumBy (compare `on` view _2) (Map.toList gsc)
-            API.guess (API.Guess (theId given) (T.pack p)) >>= \case
-                API.GuessResponse API.GuessWin _ _ -> putStrLn "Won!" >> kill'em_all >> exitSuccess
-                API.GuessResponse API.GuessError _ (Just msg) -> putStrLn (T.unpack msg) >> kill'em_all >> exitSuccess
-                API.GuessResponse API.GuessMismatch (Just vs) _ -> do
-                    addExample [(read $ T.unpack $ vs ^?! ix 0, 1000, read $ T.unpack $ vs ^?! ix 1)]
+            when (tooLarge 1000 p) $ do
+                API.guess (API.Guess (theId given) (T.pack p)) >>= \case
+                    API.GuessResponse API.GuessWin _ _ -> putStrLn "Won!" >> kill'em_all >> exitSuccess
+                    API.GuessResponse API.GuessError _ (Just msg) -> putStrLn (T.unpack msg) >> kill'em_all >> exitSuccess
+                    API.GuessResponse API.GuessMismatch (Just vs) _ -> do
+                        addExample [(read $ T.unpack $ vs ^?! ix 0, 1000, read $ T.unpack $ vs ^?! ix 1)]
+                atomically $ modifyTVar (guessCandidate given) $ at p .~ Nothing
+                putStrLn "guess:Done."
 
 addExample :: Given Environment => [(BitVector, Double, BitVector)] -> IO ()
 addExample xs = do
     forM_ xs $ \(i, w, o) -> atomically $ modifyTVar (examples given) $ at i ?~ (w, o)
-    judgement
-    removeTrivial
+    forkIO $ judgement
+    forkIO $ removeTrivial
+    return ()
     
 oracleSummoner :: (Given API.Token, Given Environment) => IO ()
 oracleSummoner = forever $ do
-    forkIO $ manufactur
+    manufactur
     t <- readTVarIO (examples given)
     u <- readTVarIO (evalCandidate given)
     v <- readTVarIO (guessCandidate given)
@@ -149,7 +158,7 @@ oracleSummoner = forever $ do
 
 trainer :: Given Environment => IO ()
 trainer = forever $ do
-    revealDistinguisher
+    forkIO $ revealDistinguisher
     threadDelay $ 6 * 1000 * 1000
 
 trainProblem :: Given API.Token => Int -> IO (T.Text, Int, [String])
@@ -175,9 +184,10 @@ main = getArgs >>= \case
                 , theSatLambdas = [WrapSMTSynth.satLambda size ops]
                 , _DEATH_NOTE = deathNote
                 }
-        
+        print (size, ops)
         (give env :: (Given Environment => IO ()) => IO ()) $ do
-            replicateM_ 8 $ spawn 10
+            replicateM_ 4 $ spawn 10
+            replicateM_ 4 $ spawn 19
             forkKillme trainer
             oracleSummoner
 
@@ -200,4 +210,6 @@ spawn t = forkKillme $ forever $ do
 
 z3Slayer = do
     procs <- map words <$> lines <$> readProcess "/bin/ps" [] ""
-    forM_ (map (!!0) $ filter (elem "<defunct>") procs) $ \pid -> system $ "kill -9" ++ pid
+    forM_ (map (!!0) $ filter (elem "<defunct>") procs) $ \pid -> do
+	putStrLn $ "kill " ++ pid
+	system $ "kill " ++ pid
