@@ -43,7 +43,13 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
           (if ("nobonus"`elem`flds) then filter (not.isBonusProb) else id) $
           (if ("notfold"`elem`flds) then filter (not.isTFoldProb) else id) $
           (if ("nofold"`elem`flds) then filter (not.isFoldProb) else id) $
+          lowerLimitter
           allProblems
+        lowerLimitter =
+           case (filter (isPrefixOf "limit") flds) of
+              _ -> id
+              (x:_) -> filter ((>(read $ drop 5 x) ). problemSize)
+
         isBonusProb = elem "bonus". problemOperators
         isTFoldProb = elem "tfold". problemOperators
         isFoldProb = elem "fold". problemOperators
