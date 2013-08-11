@@ -197,5 +197,5 @@ spawn t = forkKillme $ forever $ do
         Just _ -> return ()
 
 z3Slayer = do
-    procs <- map words <$> lines <$> readProcess "/usr/bin/ps" [] ""
+    procs <- map words <$> lines <$> readProcess "/bin/ps" [] ""
     forM_ (map (!!0) $ filter (elem "<defunct>") procs) $ \pid -> system $ "kill -9" ++ pid
