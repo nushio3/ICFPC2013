@@ -15,6 +15,7 @@ import Control.Monad.Trans
 import Data.List.Split
 
 import API
+import qualified RichBV as BV
 
 -- TODO: support fold
 -- if0, not, shl1, shr1, shr4, shr16, and, or, xor, plus
@@ -23,6 +24,9 @@ oracleIO :: Given Token => T.Text -> [Word64] -> IO [Word64]
 oracleIO ident inputs = do
   EvalResponse _estat (Just eout) _emsg <- API.eval $ EvalRequest (Just ident) Nothing $ map (T.pack . printf "0x%016X") inputs
   return eout
+
+oracleGuess :: GivenToke => Program -> IO Word8
+oracleGuess = undefined
 
 --valid :: [SWord8] -> SBool
 --valid oprs = go 0 oprs (0 :: SInt8) where
@@ -40,7 +44,7 @@ oracleIO ident inputs = do
 --interp oprs i = go oprs $ replicate maxlen 0 where
 --  maxlen = length oprs
 --  go [] (v:_) = v
---  go (opr:rest) ss = ite (opr .== 0) 0 $ go rest $
+--  go (opr:rest) ss = ite (opr .== $ go rest $
 --    ite (opr .== 1 ) (take maxlen $ 0:ss) $ -- const 0
 --    ite (opr .== 2 ) (take maxlen $ 1:ss) $ -- const 1
 --    ite (opr .== 3 ) (take maxlen $ i:ss) $ -- var
@@ -103,7 +107,7 @@ instance Applicative Symbolic where
 data Opr = If0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus
   deriving (Eq, Show)
 
---argNum :: Opr -> Int
+--argNum :: Opr -> Int 0) 0
 --argNum opr = case opr of
 --  If0   -> 3
 --  Not   -> 1
@@ -180,16 +184,22 @@ behave oprs size opcs argss i o = do
   forM_ (zip3 [3..] candss opcs) $ \(ln, cands, opc) ->
     constrain $ vars !! ln .== select cands 0 opc
 
+genProgram :: [Opr] -> Int -> Symbolic SProgram
+genProgram oprs size = do
+  opcs <- sWord8s [ printf "opc-%d" i | i <- take size [3::Int ..] ]
+  constrain $ bAll (`inRange` (0, fromIntegral $ length oprs-1)) opcs
+
+  argss <- forM (take size [3::Int ..]) $ \ln -> do
+    args <- sWord8s [ printf "arg-%d-%d" ln i | i <- [0::Int ..2] ]
+    constrain $ bAll (.< (literal $ fromIntegral ln)) args
+    return args
+
+  return (opcs, argss)
+
 distinct :: [Opr] -> Int -> [(Word64, Word64)] -> Program -> IO (Maybe Word64)
 distinct oprs size samples (oopcs, oargss) = do
   let c = do
-        opcs <- sWord8s [ printf "opc-%d" i | i <- take size [3::Int ..] ]
-        constrain $ bAll (`inRange` (0, fromIntegral $ length oprs-1)) opcs
-
-        argss <- forM (take size [3::Int ..]) $ \ln -> do
-          args <- sWord8s [ printf "arg-%d-%d" ln i | i <- [0::Int ..2] ]
-          constrain $ bAll (.< (literal $ fromIntegral ln)) args
-          return args
+        (opcs, argss) <- genProgram oprs size
 
         forM_ samples $ \(i, o) ->
           behave oprs size opcs argss (literal i) (literal o)
@@ -204,29 +214,23 @@ distinct oprs size samples (oopcs, oargss) = do
         return (true :: SBool)
 
   res <- sat c
+  generateSMTBenchmarks True "distinct" c
   return $ fmap read $ lookup "distinctInput" $ parseRes $ show res
 
 findProgram :: [Opr] -> Int -> [(Word64, Word64)] -> IO Program
 findProgram oprs size samples = do
   print (oprs, size, samples)
   let c = do
-        opcs <- sWord8s [ printf "opc-%d" i | i <- take size [3::Int ..] ]
-        constrain $ bAll (`inRange` (0, fromIntegral $ length oprs-1)) opcs
-
-        argss <- forM (take size [3::Int ..]) $ \ln -> do
-          args <- sWord8s [ printf "arg-%d-%d" ln i | i <- [0::Int ..2] ]
-          constrain $ bAll (.< (literal $ fromIntegral ln)) args
-          return args
-
+        (opcs, argss) <- genProgram oprs size
         forM_ samples $ \(i, o) ->
           behave oprs size opcs argss (literal i) (literal o)
-
         return (true :: SBool)
-  -- generateSMTBenchmarks True "test" c
+  generateSMTBenchmarks True "find" c
   res <- sat c
   return $ parseProgram $ show res
 
-type Program = ([Loc], [[Loc]])
+type Program  = ([Loc],  [[Loc]])
+type SProgram = ([SLoc], [[SLoc]])
 
 parseRes :: String -> [(String, String)]
 parseRes ss = [ (name, val) | (name: "=": val: _) <- map words $ lines ss ]
@@ -250,8 +254,24 @@ toOp "plus"  = Just Plus
 toOp "if0"   = Just If0
 toOp _       = Nothing
 
+toProgram :: [Opr] -> Program -> BV.Program
+toProgram oprs (opcs, argss) = BV.Program $ last ls where
+  ls = [BV.Constant 0, BV.Constant 1, BV.Var 0] ++
+       [ toExp (oprs !! fromIntegral opc) $ map fromIntegral args | (opc, args) <- zip opcs argss ]
+
+  toExp opr [i,j,k] = case opr of
+    Not     -> BV.Op1 BV.Not (ls !! i)
+    (Shl n) -> BV.Op1 (BV.Shl n) (ls !! i)
+    (Shr n) -> BV.Op1 (BV.Shr n) (ls !! i)
+    And     -> BV.Op2 BV.And  (ls !! i) (ls !! j)
+    Or      -> BV.Op2 BV.Or   (ls !! i) (ls !! j)
+    Xor     -> BV.Op2 BV.Xor  (ls !! i) (ls !! j)
+    Plus    -> BV.Op2 BV.Plus (ls !! i) (ls !! j)
+    If0     -> BV.If (ls !! i) (ls !! j) (ls !! k)
+
 synth :: Given Token => Int -> [T.Text] -> T.Text -> IO ()
-synth size ops ident = do
+synth ss ops ident = do
+  let size = ss - 2
   putStrLn $ "Start synthesis: " ++ show size ++ ", " ++ show ops
 
   let initNum = 4
@@ -263,9 +283,10 @@ synth size ops ident = do
 
   let go e = do
         putStrLn "behave..."
-        progn <- findProgram oprs (size-1) e
+        progn <- findProgram oprs size e
         putStrLn $ "found: " ++ show progn
-        a <- distinct oprs (size-1) e progn
+        putStrLn $ "found: " ++ (BV.printProgram $ toProgram oprs progn)
+        a <- distinct oprs size e progn
         putStrLn $ "distinct: " ++ show a
         case a of
           Nothing -> putStrLn $ "Answer found!!: " ++ show progn
@@ -274,4 +295,3 @@ synth size ops ident = do
             go ((f, g):e)
   go $ zip is os
   undefined
-
