@@ -49,9 +49,9 @@
 {% for p in under_solve_problems %}
 <tr>
   <td>{{ p.id }}</td>
-  <td>{{ p.size }}</td>
+  <td> {{ p.size }} </td>
   <td>{% for op in p.operators %}
-      {{ op }},
+      {{ op }}
       {% endfor %}
   </td>
 </tr>
@@ -63,9 +63,9 @@
 {% for p in untouched_problems %}
 <tr>
   <td>{{ p.id }}</td>
-  <td>{{ p.size }}</td>
+  <td> {{ p.size }} </td>
   <td>{% for op in p.operators %}
-      {{ op }},
+      {{ op }}
       {% endfor %}
   </td>
 </tr>
@@ -77,9 +77,9 @@
 {% for p in solved_problems %}
 <tr>
   <td>{{ p.id }}</td>
-  <td>{{ p.size }}</td>
+  <td> {{ p.size }} </td>
   <td>{% for op in p.operators %}
-      {{ op }},
+      {{ op }}
       {% endfor %}
   </td>
 </tr>
@@ -91,9 +91,9 @@
 {% for p in dead_problems %}
 <tr>
   <td>{{ p.id }}</td>
-  <td>{{ p.size }}</td>
+  <td> {{ p.size }} </td>
   <td>{% for op in p.operators %}
-      {{ op }},
+      {{ op }}
       {% endfor %}
   </td>
 </tr>
@@ -105,9 +105,9 @@
 {% for p in training_problems %}
 <tr>
   <td>{{ p.id }}</td>
-  <td>{{ p.size }}</td>
+  <td> {{ p.size }} </td>
   <td>{% for op in p.operators %}
-      {{ op }},
+      {{ op }}
       {% endfor %}
   </td>
   <td>{{ p.challenge }}</td>
