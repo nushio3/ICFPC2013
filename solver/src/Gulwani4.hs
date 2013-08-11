@@ -242,8 +242,8 @@ phiFunc lvProg exampleIdx alpha beta = do
           (Xor , [a,b])  -> a `xor` b
           (Plus , [a,b]) -> a + b
           (If0, [a,b,c]) -> ite (a .== 0) b c
-          _              -> undefined
-          
+          _              -> error $ printf "unsupported operator and arity: %s(%d)"
+               (show $ opaddr^.inst) (length $ opaddr^.ivars) 
   let allAVs :: [(Addr,Val)]
       allAVs = (fromIntegral (n-1), beta):
                avLibs
