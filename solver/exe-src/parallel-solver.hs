@@ -28,6 +28,7 @@ import qualified Data.Map as Map
 import Network.HTTP.Conduit
 import qualified WrapSMTSynth
 import SMTSynth hiding (Program)
+import Z3Slayer
 
 data Environment = Environment
     { examples :: TVar (Map.Map BitVector (Double, BitVector))
@@ -229,12 +230,3 @@ spawn t = forkKillme $ forever $ do
             Nothing -> z3Slayer >> putStrLn "Spawning: Failed."
             Just _ -> putStrLn "Spawning: Done."
         else threadDelay $ 1 * 1000 * 1000
-
-z3Slayer = do
-    procs <- map words <$> lines <$> readProcess "/bin/ps" [] ""
-    forM_ (filter (elem "<defunct>") procs) $ \case
-      (pid:_) -> do
-	putStrLn $ "kill -9 " ++ pid
-	system $ "kill -9 " ++ pid
-        return ()
-      _ -> return ()

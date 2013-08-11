@@ -31,6 +31,7 @@ library
     StupidSat
     WrapSMTSynth
     SolverAPI
+    Z3Slayer
 
 
   hs-source-dirs:    src/  
