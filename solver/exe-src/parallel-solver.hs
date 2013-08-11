@@ -57,8 +57,10 @@ genLambda t = do
                         then return ()
                         else do
                             atomically $ writeTVar (guessCandidate given) $ at p ?~ 1 $ m 
+                            forkKillme revealDistinguisher
+                            return ()
                 cs -> do
-                    atomically $ modifyTVar (examples given) $ flip (foldr (\i -> ix i . _1 +~ 3)) cs
+                    atomically $ modifyTVar (examples given) $ flip (foldr (\i -> ix i . _1 +~ 2)) cs
         Nothing -> return ()
 
 judgement :: Given Environment => IO ()
@@ -79,23 +81,24 @@ removeTrivial = do
 revealDistinguisher :: Given Environment => IO ()
 revealDistinguisher = do
     ps <- fmap Map.toList $ atomically $ readTVar $ guessCandidate given
-    i <- randomRIO (0, length ps - 1)
-    let go = do
-            j <- randomRIO (0, length ps - 1)
-            if i /= j
-                then go
-                else return j
-    j <- go
-    let a = ps !! i
-        b = ps !! j
-    equivNeq (enrichProgram $ readProgram $ fst a) (enrichProgram $ readProgram $ fst b) >>= \case 
-        Just counter -> do
-            atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 70
-            atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 70
-        Nothing -> do
-            if snd a < snd b
-                then atomically $ modifyTVar' (guessCandidate given) $ at (fst a) .~ Nothing
-                else atomically $ modifyTVar' (guessCandidate given) $ at (fst b) .~ Nothing
+    when (length ps > 2) $ do
+        i <- randomRIO (0, length ps - 1)
+        let go = do
+                j <- randomRIO (0, length ps - 1)
+                if i == j
+                    then go
+                    else return j
+        j <- go
+        let a = ps !! i
+            b = ps !! j
+        equivNeq (enrichProgram $ readProgram $ fst a) (enrichProgram $ readProgram $ fst b) >>= \case 
+            Just counter -> do
+                atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 70
+                atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 70
+            Nothing -> do
+                if snd a < snd b
+                    then atomically $ modifyTVar' (guessCandidate given) $ at (fst a) .~ Nothing
+                    else atomically $ modifyTVar' (guessCandidate given) $ at (fst b) .~ Nothing
 
 remainingTime :: Given Environment => IO Double
 remainingTime = do
@@ -122,7 +125,7 @@ manufactur = do
     where
         eval = do
             print "eval"
-            es' <- fmap (take 240 . sortBy (flip (compare `on` view _2)) . Map.toList)
+            es' <- fmap (take 256 . sortBy (flip (compare `on` view _2)) . Map.toList)
                 $ atomically $ readTVar (evalCandidate given)
             let es = map fst es'
             is <- (es++) <$> replicateM (256 - length es) randomIO
@@ -164,11 +167,6 @@ oracleSummoner = forever $ do
     atomically $ writeTVar (strictness given) (sqrt $ 1024 / fromIntegral (Map.size t))
     threadDelay $ 4 * 1000 * 1000
 
-trainer :: Given Environment => IO ()
-trainer = forever $ do
-    forkIO $ revealDistinguisher
-    threadDelay $ 5 * 1000 * 1000
-
 trainProblem :: Given API.Token => Int -> IO (T.Text, Int, [String])
 trainProblem level = do
     API.TrainingProblem prog ident size ops <- API.train $ API.TrainRequest level []
@@ -200,8 +198,7 @@ main = getArgs >>= \case
         (give env :: (Given Environment => IO ()) => IO ()) $ do
             replicateM_ 3 $ spawn (read w1)
             replicateM_ 3 $ spawn (read w2)
-            replicateM_ 3 $ spawn (read w3)
-            forkKillme trainer
+            replicateM_ 2 $ spawn (read w3)
             oracleSummoner
 
 forkKillme :: Given Environment => IO () -> IO ThreadId
@@ -217,10 +214,9 @@ kill'em_all = do
 
 spawn :: Given Environment => Double -> IO ThreadId
 spawn t = forkKillme $ forever $ do
-    forkKillme $ timeout (floor $ t * 2 * 1000 * 1000) (genLambda t) >>= \case
+    timeout (floor $ t * 2 * 1000 * 1000) (genLambda t) >>= \case
         Nothing -> z3Slayer >> putStrLn "Spawning: Failed."
         Just _ -> putStrLn "Spawning: Done."
-    threadDelay $ 10 * 1000 * 1000
 
 z3Slayer = do
     procs <- map words <$> lines <$> readProcess "/bin/ps" [] ""

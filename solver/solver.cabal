@@ -30,6 +30,7 @@ library
     SolverUtil
     StupidSat
     WrapSMTSynth
+    SolverAPI
 
 
   hs-source-dirs:    src/  
@@ -241,3 +242,17 @@ executable parallel-solver
     , reflection
     , time
   buildable: False
+
+executable solver-api-server
+  Hs-Source-Dirs: exe-src
+  Main-Is: solver-server.hs
+  Build-Depends:
+    base==4.*
+    , aeson
+    , bytestring
+    , solver
+    , scotty
+    , wai-extra
+    , http-types
+    , text
+    , mtl
