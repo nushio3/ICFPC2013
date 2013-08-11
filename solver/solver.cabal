@@ -261,5 +261,5 @@ executable solver-api-server
     , text
     , mtl
 
-  buildable: False
+  buildable: True
 
