@@ -271,13 +271,44 @@ genProgram myFlags oprs size = do
   opid (Shr 4)  $ \i j k -> i ./= 0 &&& i ./= 1
   opid (Shr 16) $ \i j k -> i ./= 0 &&& i ./= 1
 
-  when (myFlags ^. bonusMode) $ trace (printf "Bonus\\(^o^)/ size:%d\n" size) $ do
+  when (myFlags ^. bonusMode) $ do
     let lastOpcI  = length opcs - 1
         lastOpcI2 = length opcs - 2
         
-        lastAdrI  = length opcs - 1 + 3
-        lastAdrI2 = length opcs - 2 + 3
+        lastAdrI  = length opcs - 1 + offs
+        lastAdrI2 = length opcs - 2 + offs
         
+        red   = 0 :: SWord8
+        green = 1 :: SWord8
+        blue  = 2 :: SWord8
+    varColors <- sWord8s [ printf "color-%d" ln | ln <- [0::Int ..size+offs-1]]        
+    forM_ varColors $ (\c -> constrain $ c .<= blue)
+        
+      
+    let candColorThm vars = flip map argss $ \[x, y, z] ->
+          let var ix = select varColors 0 ix
+              vx = var x
+              vy = var y
+              vz = var z
+              vx0 = vx .== 0
+          in flip map oprs $ \opr -> case opr of
+            Not   -> complement vx
+            Shl n -> vx `shiftL` n
+            Shr n -> vx `shiftR` n
+            And   -> vx .&. vy
+            Or    -> vx .|. vy
+            Xor   -> vx `xor` vy
+            Plus  -> vx + vy
+      
+    forM_ (zip3 [offs..] (candColorThm varColors) opcs) $ \(ln, candThms, opc) ->
+        constrain $ varColors !! ln .== select candThms 0 opc
+
+
+    constrain $ varColors !! lastAdrI2 .== red
+    constrain $ varColors !! lastAdrI  .== blue
+    forM_ [offs .. size + offs-2] $ \ln -> undefined
+    
+    
     case findIndex (==If0) oprs of
       Nothing ->  error "Bonus problem without If0 \\(>_<)/"  
       Just ifcode ->    
