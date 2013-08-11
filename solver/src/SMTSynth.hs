@@ -151,10 +151,9 @@ genProgram myFlags oprs size = do
   border <- sWord8 "border"
   constrain $ inRange border (fromIntegral offs+2, fromIntegral $ offs + length argss - 1)
 
-  -- TODO:
-  --when (myFlags ^. foldMode) $ do
-  --  forM_ (zip [offs..] argss) $ \(ln, args) -> do
-  --    constrain $ bAll (\loc -> ln .>= .< (literal $ fromIntegral ln)) args
+  when (myFlags ^. foldMode) $ do
+    forM_ (zip [offs..] argss) $ \(ln, args) -> do
+      constrain $ fromIntegral ln .>= border ==> (bAll (\loc -> loc .<= 3 ||| loc .>= border) args)
 
   -- remove trivial cases
   let opid opr f = case findIndex (==opr) oprs of
