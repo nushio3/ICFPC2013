@@ -393,10 +393,10 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
   putStrLn $ "Start synthesis: " ++ T.unpack ident ++ " " ++ show ss ++ " (" ++ show size ++ "), " ++ show ops
   when isTFold $ putStrLn "TFold Mode (>_<);;"
 
-  let go es add = do
+  let go es = do
         -- putStrLn "behave..."
-        putStrLn $ "inputs: " ++ show (add ++ es)
-        progn <- para cpuNum $ \i -> findProgram i myFlags oprs (size + i `mod` 4) $ add ++ es
+        putStrLn $ "inputs: " ++ show es
+        progn <- para cpuNum $ \i -> findProgram i myFlags oprs (size + i `mod` 4) $ take 5 es
         system "pkill z3"
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram myFlags oprs progn)
         o <- oracleDistinct ident $ toProgram myFlags oprs progn
@@ -405,7 +405,7 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
             putStrLn "Accepted: yatapo-(^_^)!"
           Just oo -> do
             putStrLn $ "distinct: " ++ show oo
-            go es (oo:add)
+            go (oo:es)
 
         ---- a <- distinct oprs size e progn
         --case a of
@@ -414,4 +414,4 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
         --    [g] <- oracleIO ident [f]
         --    go ((f, g):e)
 
-  go es []
+  go es
