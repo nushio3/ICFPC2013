@@ -10,6 +10,7 @@ import qualified Data.Text as T
 import Text.Printf
 import Data.Maybe
 import Control.Applicative
+import Data.List
 import Data.List.Split
 
 import API
@@ -26,14 +27,14 @@ oracleIO ident inputs = do
 oracleGuess :: Given Token => Program -> IO Word8
 oracleGuess = undefined
 
-oracleDistinct :: Given Token => T.Text -> BV.Program -> IO (Word64, Word64)
+oracleDistinct :: Given Token => T.Text -> BV.Program -> IO (Maybe (Word64, Word64))
 oracleDistinct ident p = do
   GuessResponse gstat gval gmsg <- guess $ Guess ident (T.pack $ BV.printProgram p)
   case gstat of
-    GuessWin      -> fail "yatapo-(^_^)"
+    GuessWin      -> return Nothing
     GuessMismatch -> case gval of
       Just [i, o, _myo] ->
-        return (read $ T.unpack i, read $ T.unpack o)
+        return $ Just (read $ T.unpack i, read $ T.unpack o)
       _ ->
         fail "tsurapoyo('_`)"
     GuessError -> fail $ show gmsg
@@ -114,7 +115,7 @@ instance Applicative Symbolic where
 --type Addr = SWord16
 --type Val = SWord64
 
-data Opr = If0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus
+data Opr = If0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus | Bonus
   deriving (Eq, Show)
 
 argNum :: Opr -> Int
@@ -196,7 +197,10 @@ behave oprs size opcs argss i o = do
     constrain $ vars !! ln .== select cands 0 opc
 
 genProgram :: [Opr] -> Int -> Symbolic SProgram
-genProgram oprs size = do
+genProgram oprs0 size = do
+  let bonusMode = Bonus `elem` oprs0
+      oprs = filter (/= Bonus) oprs0
+  
   opcs <- sWord8s [ printf "opc-%d" i | i <- take size [3::Int ..] ]
   constrain $ bAll (`inRange` (0, fromIntegral $ length oprs-1)) opcs
 
@@ -205,6 +209,55 @@ genProgram oprs size = do
     constrain $ bAll (.< (literal $ fromIntegral ln)) args
     return args
 
+  -- remove trivial cases
+  let opid opr f = case findIndex (==opr) oprs of
+        Just ix -> forM_ (zip opcs argss) $ \(opc, [i,j,k]) ->
+          constrain $ ((opc .== (literal $ fromIntegral ix)) ==> f i j k)
+        Nothing -> return ()
+
+  -- redundant
+
+  -- (if0 0 _) and (if0 1 _) is redundant
+  opid If0 $ \i j k -> i ./= 0 &&& i ./= 1 &&& j .< k
+
+  -- (and 0 _) and (and _ 0)
+  opid And $ \i j _ -> i ./= 0 &&& j ./= 0 &&& i .< j
+
+  -- (or 0 _) and (or _ 0)
+  opid Or  $ \i j _ -> i ./= 0 &&& j ./= 0 &&& i .< j
+
+  -- (xor 0 _) and (xor _ 0)
+  opid Xor $ \i j _ -> i ./= 0 &&& j ./= 0 &&& i .< j
+
+  -- (shxx 0) (shrx 1)
+  opid (Shl 1)  $ \i _ _ -> i ./= 0
+  opid (Shr 1)  $ \i _ _ -> i ./= 0 &&& i ./= 1
+  opid (Shr 4)  $ \i _ _ -> i ./= 0 &&& i ./= 1
+  opid (Shr 16) $ \i _ _ -> i ./= 0 &&& i ./= 1
+
+  -- (plus 0 _) (plus _ 0) (plus i j) i >= j
+  opid Plus $ \i j _ -> i ./= 0 &&& j ./= 0 &&& i .<= j
+
+  when bonusMode $ error "Bonus kitapo \\(>_<)/"  
+  
+  when bonusMode $ do
+    let lastOpcI  = length opcs - 1
+        lastOpcI2 = length opcs - 2
+        
+        lastAdrI  = length opcs - 1 + 3
+        lastAdrI2 = length opcs - 2 + 3
+        
+    case findIndex (==If0) oprs of
+      Nothing ->  error "Bonus problem without If0 \\(>_<)/"  
+      Just ifcode ->    
+        constrain $ (opcs !! lastOpcI) .== fromIntegral ifcode
+    case findIndex (==And) oprs of
+      Nothing ->  error "Bonus problem without And \\(>_<)/"        
+      Just andcode -> do
+        constrain $ (opcs!! lastOpcI2) .== fromIntegral andcode
+        constrain $ (argss !! lastOpcI !! 0) .== fromIntegral lastAdrI2
+        constrain $ (argss !! lastOpcI2!! 0) .== 1
+        
   return (opcs, argss)
 
 distinct :: [Opr] -> Int -> [(Word64, Word64)] -> Program -> IO (Maybe Word64)
@@ -263,6 +316,7 @@ toOp "or"    = Just Or
 toOp "xor"   = Just Xor
 toOp "plus"  = Just Plus
 toOp "if0"   = Just If0
+toOp "bonus" = Just Bonus
 toOp _       = Nothing
 
 toProgram :: [Opr] -> Program -> BV.Program
@@ -279,13 +333,10 @@ toProgram oprs (opcs, argss) = BV.Program $ last ls where
     Xor     -> BV.Op2 BV.Xor  (ls !! i) (ls !! j)
     Plus    -> BV.Op2 BV.Plus (ls !! i) (ls !! j)
     If0     -> BV.If (ls !! i) (ls !! j) (ls !! k)
-  toExp _ _ = error "tsurapoyo"
+  toExp _ _ = error "tsurapoyo(-_-)"
 
 synth :: Given Token => Int -> [T.Text] -> T.Text -> IO ()
-synth ss ops ident = do
-  -- is <- zipWith (\i v -> v `div` initNum * initNum + i) [0..] <$> replicateM (fromIntegral initNum) randomIO
-  when ("fold" `elem` ops || "tfold" `elem` ops) $ fail "I can not use fold (>_<)"
-
+synth ss ops ident = if "fold" `elem` ops || "tfold" `elem` ops then putStrLn "I can not use fold (>_<)" else do
   let is = [0, 1]
   os <- oracleIO ident is
 
@@ -298,9 +349,13 @@ synth ss ops ident = do
         -- putStrLn "behave..."
         progn <- findProgram oprs size e
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram oprs progn)
-        (f, g) <- oracleDistinct ident $ toProgram oprs progn
-        putStrLn $ "distinct: " ++ show (f, g)
-        go ((f, g):e)
+        o <- oracleDistinct ident $ toProgram oprs progn
+        case o of
+          Nothing -> do
+            putStrLn "Accepted: yatapo-(^_^)!"
+          Just oo -> do
+            putStrLn $ "distinct: " ++ show oo
+            go (oo:e)
 
         ---- a <- distinct oprs size e progn
         --case a of
