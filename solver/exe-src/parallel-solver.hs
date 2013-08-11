@@ -10,7 +10,9 @@ import Data.List
 import Data.Function
 import Convert
 import RichBV
+import System.Exit
 import Text.Printf
+import System.Environment
 import System.Random
 import System.Process
 import System.IO.Unsafe
@@ -21,7 +23,8 @@ import System.Timeout
 import BV (BitVector)
 import qualified API
 import qualified Data.Map as Map
-import qualified Gulwani4
+
+import qualified WrapSMTSynth
 type Candidate = V.Vector
 data Environment = Environment
     { examples :: TVar (Map.Map BitVector (Double, BitVector))
@@ -31,6 +34,7 @@ data Environment = Environment
     , startTime :: UTCTime
     , theId :: T.Text
     , theSatLambdas :: [Double -> Map.Map BitVector (Double, BitVector) -> IO (Maybe String)]
+    , _DEATH_NOTE :: TVar [ThreadId]
     }
 
 findCounterExamples :: Given Environment => Program -> IO [BitVector]
@@ -122,8 +126,8 @@ manufactur = do
             gsc <- atomically $ readTVar (guessCandidate given)
             let (p, _) = maximumBy (compare `on` view _2) (Map.toList gsc)
             API.guess (API.Guess (theId given) (T.pack p)) >>= \case
-                API.GuessResponse API.GuessWin _ _ -> fail "Won!"
-                API.GuessResponse API.GuessError _ (Just msg) -> fail (T.unpack msg)
+                API.GuessResponse API.GuessWin _ _ -> putStrLn "Won!" >> kill'em_all >> exitSuccess
+                API.GuessResponse API.GuessError _ (Just msg) -> putStrLn (T.unpack msg) >> kill'em_all >> exitSuccess
                 API.GuessResponse API.GuessMismatch (Just vs) _ -> do
                     addExample [(read $ T.unpack $ vs ^?! ix 0, 1000, read $ T.unpack $ vs ^?! ix 1)]
 
@@ -152,29 +156,43 @@ trainProblem level = do
     API.TrainingProblem prog ident size ops <- API.train $ API.TrainRequest level []
     return (ident, size, map T.unpack ops)
 
-main = give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ do
-    (ident, size, ops) <- trainProblem 5
-    ves <- newTVarIO Map.empty
-    vgs <- newTVarIO Map.empty
-    vev <- newTVarIO $ Map.fromList $ zip [0,1,2,3,4,5,15,16,17,65535,65536,65537] (repeat 50)
-    oc <- newTVarIO 0
-    t <- getCurrentTime
-    let env = Environment { examples = ves
-            , guessCandidate = vgs
-            , evalCandidate = vev
-            , oracleCount = oc
-            , startTime = t
-            , theId = ident
-            , theSatLambdas = [Gulwani4.satLambda size ops]
-            }
-    
-    (give env :: (Given Environment => IO ()) => IO ()) $ do
-        forkIO $ forever $ genLambda 10
-        forkIO trainer
-        oracleSummoner
+main = getArgs >>= \case
+    (level : _) -> give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ do
+        (ident, size, ops) <- trainProblem (read level)
+        ves <- newTVarIO Map.empty
+        vgs <- newTVarIO Map.empty
+        vev <- newTVarIO $ Map.fromList $ zip [0,1,2,3,4,5,15,16,17,65535,65536,65537] (repeat 50)
+        deathNote <- newTVarIO []
+        oc <- newTVarIO 0
+        t <- getCurrentTime
+        let env = Environment { examples = ves
+                , guessCandidate = vgs
+                , evalCandidate = vev
+                , oracleCount = oc
+                , startTime = t
+                , theId = ident
+                , theSatLambdas = [WrapSMTSynth.satLambda size ops]
+                , _DEATH_NOTE = deathNote
+                }
+        
+        (give env :: (Given Environment => IO ()) => IO ()) $ do
+            forkKillme $ forever $ genLambda 10
+            forkKillme trainer
+            oracleSummoner
+
+forkKillme :: Given Environment => IO () -> IO ThreadId
+forkKillme m = do
+    i <- forkIO m
+    atomically $ modifyTVar (_DEATH_NOTE given) (i:)
+    return i
+
+kill'em_all :: Given Environment => IO ()
+kill'em_all = do
+    is <- readTVarIO (_DEATH_NOTE given)
+    forM_ is killThread
 
 spawn :: Given Environment => Double -> IO ThreadId
-spawn t = forkIO $ do
+spawn t = forkKillme $ do
     timeout (floor $ t * 2 * 1000 * 1000) (genLambda t) >>= \case
         Nothing -> z3Slayer
         Just _ -> return ()

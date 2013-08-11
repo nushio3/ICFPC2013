@@ -27,6 +27,8 @@ library
     SMTSynth
     Gulwani4
     GulwaniHead
+    SolverUtil
+    WrapSMTSynth
 
 
   hs-source-dirs:    src/  
