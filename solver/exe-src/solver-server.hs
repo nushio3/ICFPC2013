@@ -13,6 +13,12 @@ import Network.Wai.Middleware.RequestLogger -- install wai-extra if you don't ha
 import Gulwani4
 import SolverAPI
 
+{-
+- Things to be implemented:
+--- Change port.
+--- Record and report load.
+-}
+
 main = scotty 10203 $ do
   middleware logStdoutDev
 
