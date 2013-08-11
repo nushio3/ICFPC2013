@@ -32,6 +32,7 @@ data Environment = Environment
     , oracleCount :: TVar Int
     , startTime :: UTCTime
     , theId :: T.Text
+    , strictness :: TVar Double
     , theSatLambdas :: [Double -> Map.Map BitVector (Double, BitVector) -> IO (Maybe String)]
     , _DEATH_NOTE :: TVar [ThreadId]
     }
@@ -42,20 +43,22 @@ findCounterExamples prog = do
     return $ [i | (i, (p, o)) <- Map.toList es, eval prog i /= o ]
 
 genLambda :: Given Environment => Double -> IO ()
-genLambda t = atomically (readTVar (examples given)) >>= head (theSatLambdas given) t >>= \case
-    Just p -> do
-        let prog = enrichProgram $ readProgram p
-        findCounterExamples prog >>= \case
-            [] -> do
-                m <- atomically $ readTVar (guessCandidate given)
-                if any (unsafePerformIO . equiv prog)
-                    $ map (enrichProgram . readProgram) $ Map.keys m
-                    then return ()
-                    else do
-                        atomically $ writeTVar (guessCandidate given) $ at p ?~ 1 $ m 
-            cs -> do
-                atomically $ modifyTVar (examples given) $ flip (foldr (\i -> ix i . _1 +~ 1)) cs
-    Nothing -> return ()
+genLambda t = do
+    ratio <- readTVarIO (strictness given)
+    atomically (readTVar (examples given)) >>= head (theSatLambdas given) (t * ratio) >>= \case
+        Just p -> do
+            let prog = enrichProgram $ readProgram p
+            findCounterExamples prog >>= \case
+                [] -> do
+                    m <- atomically $ readTVar (guessCandidate given)
+                    if any (unsafePerformIO . equiv prog)
+                        $ map (enrichProgram . readProgram) $ Map.keys m
+                        then return ()
+                        else do
+                            atomically $ writeTVar (guessCandidate given) $ at p ?~ 1 $ m 
+                cs -> do
+                    atomically $ modifyTVar (examples given) $ flip (foldr (\i -> ix i . _1 +~ 1)) cs
+        Nothing -> return ()
 
 judgement :: Given Environment => IO ()
 judgement = do
@@ -154,6 +157,7 @@ oracleSummoner = forever $ do
     u <- readTVarIO (evalCandidate given)
     v <- readTVarIO (guessCandidate given)
     printf "Examples: %d, Eval: %d, Guess: %d\n" (Map.size t) (Map.size u) (Map.size v)
+    atomically $ writeTVar (strictness given) (sqrt $ 1024 / fromIntegral (Map.size t))
     threadDelay $ 4 * 1000 * 1000
 
 trainer :: Given Environment => IO ()
@@ -175,12 +179,14 @@ main = getArgs >>= \case
         deathNote <- newTVarIO []
         oc <- newTVarIO 0
         t <- getCurrentTime
+        st <- newTVarIO 1.0
         let env = Environment { examples = ves
                 , guessCandidate = vgs
                 , evalCandidate = vev
                 , oracleCount = oc
                 , startTime = t
                 , theId = ident
+                , strictness = st
                 , theSatLambdas = [WrapSMTSynth.satLambda size ops]
                 , _DEATH_NOTE = deathNote
                 }
