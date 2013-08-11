@@ -275,8 +275,12 @@ genProgram myFlags oprs size = do
     let lastOpcI  = length opcs - 1
         lastOpcI2 = length opcs - 2
         
-        lastAdrI  = length opcs - 1 + 3
-        lastAdrI2 = length opcs - 2 + 3
+        lastAdrI  = length opcs - 1 + offs
+        lastAdrI2 = length opcs - 2 + offs
+        
+    let red   = 0 :: SWord8
+        green = 1 :: SWord8
+        blue  = 2 :: SWord8
         
     case findIndex (==If0) oprs of
       Nothing ->  error "Bonus problem without If0 \\(>_<)/"  

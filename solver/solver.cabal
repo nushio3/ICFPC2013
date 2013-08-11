@@ -253,7 +253,9 @@ executable solver-api-server
     , bytestring
     , solver
     , scotty
+    , resourcet
     , wai-extra
     , http-types
     , text
     , mtl
+  buildable: False
