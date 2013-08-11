@@ -313,7 +313,6 @@ genProgram myFlags oprs size = do
 
     constrain $ varColors !! lastAdrI2 .== red
     constrain $ varColors !! lastAdrI  .== blue
-    forM_ [offs .. size + offs-2] $ \ln -> undefined
     
     
     case findIndex (==If0) oprs of
@@ -359,7 +358,8 @@ findProgram seed myFlags oprs size samples = do
         return (true :: SBool)
   -- generateSMTBenchmarks True "find" c
   res <- satWith (z3 {solver=(solver z3) {options=options (solver z3) ++ ["smt.random_seed="++show seed]}}) c
-  -- print res
+  
+  print res
   return $ parseProgram (myFlags^.tfoldMode) $ show res
 
 type Program  = ([Loc],  [[Loc]])
