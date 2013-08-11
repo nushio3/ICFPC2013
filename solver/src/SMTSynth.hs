@@ -278,11 +278,17 @@ genProgram myFlags oprs size = do
         lastAdrI  = length opcs - 1 + offs
         lastAdrI2 = length opcs - 2 + offs
         
-        red   = 0 :: SWord8
-        green = 1 :: SWord8
-        blue  = 2 :: SWord8
+        white = 0 :: SWord8
+        red   = 1 :: SWord8
+        green = 2 :: SWord8
+        blue  = 4 :: SWord8
+        black = 15 :: SWord8 
+        
+        darker a b = a .&. b .== b
     varColors <- sWord8s [ printf "color-%d" ln | ln <- [0::Int ..size+offs-1]]        
-    forM_ varColors $ (\c -> constrain $ c .<= blue)
+    forM_ (take offs varColors) $ (\c -> constrain $ c .== white)
+    forM_ (drop offs varColors) $ 
+      (\c -> constrain $ c .== red ||| c.== green ||| c.==blue)
         
       
     let candColorThm vars = flip map argss $ \[x, y, z] ->
@@ -292,16 +298,17 @@ genProgram myFlags oprs size = do
               vz = var z
               vx0 = vx .== 0
           in flip map oprs $ \opr -> case opr of
-            Not   -> complement vx
-            Shl n -> vx `shiftL` n
-            Shr n -> vx `shiftR` n
-            And   -> vx .&. vy
+            Not   -> vx
+            Shl n -> vx 
+            Shr n -> vx 
+            And   -> vx .|. vy
             Or    -> vx .|. vy
-            Xor   -> vx `xor` vy
-            Plus  -> vx + vy
-      
+            Xor   -> vx .|. vy
+            Plus  -> vx .|. vy
+            If0   -> ite (vx.==red &&& vy.==green &&& vz.==blue) red black      
+    
     forM_ (zip3 [offs..] (candColorThm varColors) opcs) $ \(ln, candThms, opc) ->
-        constrain $ varColors !! ln .== select candThms 0 opc
+        constrain $ (varColors !! ln) `darker` (select candThms 0 opc)
 
 
     constrain $ varColors !! lastAdrI2 .== red
