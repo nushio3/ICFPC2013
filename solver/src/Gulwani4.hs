@@ -23,6 +23,7 @@ import BV(BitVector)
 import RichBV(printProgram)
 import qualified BV
 import SBV(SBitVector)
+import SolverUtil
 
 type Addr = SWord8
 type Val = SBitVector
@@ -136,17 +137,18 @@ progOfSize size0 opList0 = do
   return (thmWfp, LVProgram {-  ret -}  addrLib)
 
 testMain =  do
-  satLambda 20 ["plus", "if0"] $
+  satLambda 20 ["plus", "if0"] 60 $
     Map.fromList 
       [( 0 , (1.341, 1))
       ,( 3 , (1.341, 6)) ]
 
 satLambda :: Int -> [String] ->  Double -> Map.Map BitVector (Double, BitVector) -> IO (Maybe String)
 satLambda  probSize opStrs weight exampleMap = do
+  sparseExamples <- 
+    sampleExample (max 2 $ round $ weight / fromIntegral (probSize * length opStrs)) exampleMap
   let 
     examples :: [(SBitVector, SBitVector)]
-    examples = map (both %~ fromIntegral) $ 
-               map (_2 %~ snd)$ Map.toList exampleMap
+    examples = map (both %~ fromIntegral) $ sparseExamples
 
   ret <- sat $ do
     (thmWfp, prog) <- progOfSize probSize $ map toOp opStrs
