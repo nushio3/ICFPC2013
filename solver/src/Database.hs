@@ -11,68 +11,74 @@ import SRichBV
 import Debug.Trace
 import Data.List
 import qualified Data.Set as Set
+import Control.Monad.Logic
 type Database = Map.Map (Int, [Op], Int) [Expression]
 
 niceGenProgram :: Int -> [Op] -> [Program]
 niceGenProgram size ops = do
-  e <- niceGenExpression (size - 1) ops 1 `evalState` (Map.empty, Set.fromList ops)
-  return $ Program e
+  let e = observeAllT (niceGenExpression (size - 1) ops 1) `evalState` (Map.empty, Set.fromList ops)
+  map Program e
 
-niceGenExpression :: Int -> [Op] -> Int -> State (Database, Set.Set Op) [Expression]
+fromList :: [a] -> LogicT m a
+fromList xs = LogicT $ \f x -> foldr f x xs
+
+niceGenExpression :: Int -> [Op] -> Int -> LogicT (State (Database, Set.Set Op)) Expression
 niceGenExpression size ops vars = use _2 >>= \unused -> preuse (_1 . ix (size, ops, vars)) >>= \case
-    Just r -> return r
+    Just r -> fromList r
     Nothing
-        | size == 1 && Set.null unused -> return $ [Constant 0, Constant 1] ++ map Var [0..vars-1]
+        | size == 1 && Set.null unused -> fromList $ [Constant 0, Constant 1] ++ map Var [0..vars-1]
         | size >= 2 -> do
-            es <- fmap concat $ sequence [op1, op2, ifs, folds]
-            forM_ es $ \e -> preuse (_1 . ix (size, ops, vars)) >>= \case
-                Just xs
-                    | size < 6 && any (unsafePerformIO . equivE e) xs -> return ()
-                    | otherwise -> _1 . ix (size, ops, vars) .= e : xs
-                Nothing -> _1 . at (size, ops, vars) ?= [e]
+            e <- op1 <|> op2 <|> ifs <|> folds
+            
             preuse (_1 . ix (size, ops, vars)) >>= \case
-                Just xs -> return xs
-                Nothing -> return []
-        | otherwise -> return []
+                Just xs
+                    | size < 6 && any (unsafePerformIO . equivE e) xs -> empty
+                    | otherwise -> do
+                        _1 . ix (size, ops, vars) .= e : xs
+                        return e
+                Nothing -> do
+                    _1 . at (size, ops, vars) ?= [e]
+                    return e
+        | otherwise -> empty
     where
         ops' = filter (/=TFold) ops
         ops1 = filter isOp1 ops
         ops2 = filter isOp2 ops
         op1 = do
-            fmap concat $ forM ops1 $ \op -> do
-                _2 . contains op .= False
-                es <- niceGenExpression (size - 1) ops' vars
-                return $ Op1 op <$> es
+            op <- fromList ops1
+            _2 . contains op .= False
+            e <- niceGenExpression (size - 1) ops' vars
+            return $ Op1 op e
         op2 = do
-            fmap concat $ forM [1..size-2] $ \i -> do
-                let j = size - i - 1
-                fmap concat $ forM ops2 $ \op -> do
-                    _2 . contains op .= False
-                    ls <- niceGenExpression i ops' vars
-                    rs <- niceGenExpression j ops' vars
-                    return $ Op2 op <$> ls <*> rs
+            op <- fromList ops2
+            i <- fromList [1..size-2]
+            let j = size - i - 1
+            _2 . contains op .= False
+            l <- niceGenExpression i ops' vars
+            r <- niceGenExpression j ops' vars
+            return $ Op2 op l r
         
-        ifs = fmap concat $ forM [1..size-3] $ \i -> 
-            fmap concat $ forM [1..size-3] $ \j ->
-            fmap concat $ forM [1..size-3] $ \k -> do
-                if i + j + k + 1 == size
-                    then do
-                        _2 . contains If0 .= False
-                        ps <- niceGenExpression i ops' vars
-                        ts <- niceGenExpression j ops' vars
-                        es <- niceGenExpression k ops' vars
-                        return $ If <$> ps <*> ts <*> es
-                    else
-                        return []
+        ifs = do
+            i <- fromList [1..size-3]
+            j <- fromList [1..size-3]
+            let k = size - 1 - i - j
+            guard $ k > 0
+            _2 . contains If0 .= False
+            p <- niceGenExpression i ops' vars
+            t <- niceGenExpression j ops' vars
+            e <- niceGenExpression k ops' vars
+            return $ If p t e
         folds
-            | Fold0 `elem` ops || TFold `elem` ops = fmap concat $ forM [1..size-4] $ \i -> 
-                fmap concat $ forM [1..size-4] $ \j ->
-                fmap concat $ forM [1..size-4] $ \k -> do
-                    let ops'' = filter (/=Fold0) ops'
-                    _2 . contains Fold0 .= False
-                    _2 . contains TFold .= False
-                    as <- niceGenExpression i ops'' vars
-                    bs <- niceGenExpression j ops'' vars
-                    cs <- niceGenExpression k ops'' (vars + 2)
-                    return $ Fold vars (vars + 1) <$> as <*> bs <*> cs 
-            | otherwise = return []
+            | Fold0 `elem` ops || TFold `elem` ops = do
+                i <- fromList [1..size-4]
+                j <- fromList [1..size-4]
+                let k = size - 2 - i - j
+                guard $ k > 0
+                let ops'' = filter (/=Fold0) ops'
+                _2 . contains Fold0 .= False
+                _2 . contains TFold .= False
+                a <- niceGenExpression i ops'' vars
+                b <- niceGenExpression j ops'' vars
+                c <- niceGenExpression k ops'' (vars + 2)
+                return $ Fold vars (vars + 1) a b c
+            | otherwise = empty
