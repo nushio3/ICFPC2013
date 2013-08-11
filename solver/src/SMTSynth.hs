@@ -18,6 +18,7 @@ import Control.Concurrent.Async
 import System.Cmd
 import System.IO.Unsafe
 import Control.Monad.Trans
+import Control.Concurrent
 
 import API
 import qualified RichBV as BV
@@ -153,6 +154,7 @@ genProgram myFlags oprs size = do
 
   when (myFlags ^. foldMode) $ do
     forM_ (zip [offs..] argss) $ \(ln, args) -> do
+      constrain $ fromIntegral ln .<  border ==> (bAll (\loc -> loc ./= 3) args)
       constrain $ fromIntegral ln .>= border ==> (bAll (\loc -> loc .<= 3 ||| loc .>= border) args)
 
   -- remove trivial cases
@@ -265,8 +267,11 @@ findProgram myFlags oprs size samples = do
         return (true :: SBool)
   -- generateSMTBenchmarks True "find" c
   res <- satWith (z3 {solver=(solver z3) {options=options (solver z3) ++ ["smt.random_seed="++show (myFlags ^. randomSeed)]}}) c
-  -- print res
-  return $ parseProgram (myFlags^.tfoldMode) $ show res
+  if modelExists res
+    then return $ parseProgram (myFlags^.tfoldMode) $ show res
+    else do
+      threadDelay $ 1000 * 10^6
+      undefined
 
 type Program  = ([Loc],  [[Loc]], Loc)
 type SProgram = ([SLoc], [[SLoc]], SLoc)
@@ -333,9 +338,9 @@ synth :: Given Token => Int -> Int -> [T.Text] -> T.Text -> IO ()
 synth cpuNum ss ops' ident = do
   let (ops, adj, isTFold, isFold)
         | "tfold" `elem` ops' =
-          (ops' \\ ["tfold", "fold"], -5, True, False)
+          (ops' \\ ["tfold", "fold"], -6, True, False)
         | "fold" `elem` ops' =
-          (ops' \\ ["tfold", "fold"], -5, False, True)
+          (ops' \\ ["tfold", "fold"], -6, False, True)
         | otherwise =
           (ops', -2, False, False)
 
