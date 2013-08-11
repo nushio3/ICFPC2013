@@ -12,6 +12,7 @@ import Control.Applicative
 import Control.Monad.Trans
 import Data.List
 import Data.Function
+import System.Timeout
 
 import API
 
@@ -47,10 +48,9 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
         isTFoldProb = elem "tfold". problemOperators
         isFoldProb = elem "fold". problemOperators
 
-        
-
     forM_ (sortBy (compare `on` problemSize) problems) $ \p -> do
       when (isSolved p /= Just True && timeLeft p /= Just 0) $ do
-        synth (read cpu) (problemSize p) (problemOperators p) (problemId p)
+        mb <- timeout (300*10^6) $ synth (read cpu) (problemSize p) (problemOperators p) (problemId p)
+        when (isNothing mb) $ putStrLn "timeout poyo ('_`) tsurai..."
   _ -> do
     fail "invalid input ('_`)"

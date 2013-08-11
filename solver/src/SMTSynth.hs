@@ -53,9 +53,12 @@ oracleDistinct ident p = do
     GuessMismatch -> case gval of
       Just [i, o, _myo] ->
         return $ Just (read $ T.unpack i, read $ T.unpack o)
-      _ ->
-        fail "tsurapoyo('_`)"
-    GuessError -> fail $ show gmsg
+      _ -> do
+        putStrLn "tsurapoyo('_`)"
+        return Nothing
+    GuessError -> do
+      putStrLn $ show gmsg
+      return Nothing
 
 instance Applicative Symbolic where
   pure = return
