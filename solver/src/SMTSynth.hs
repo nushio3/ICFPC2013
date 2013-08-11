@@ -114,7 +114,7 @@ instance Applicative Symbolic where
 --type Addr = SWord16
 --type Val = SWord64
 
-data Opr = If0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus
+data Opr = If0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus | Bonus
   deriving (Eq, Show)
 
 argNum :: Opr -> Int
@@ -292,6 +292,7 @@ toOp "or"    = Just Or
 toOp "xor"   = Just Xor
 toOp "plus"  = Just Plus
 toOp "if0"   = Just If0
+toOp "bonus" = Just Bonus
 toOp _       = Nothing
 
 toProgram :: [Opr] -> Program -> BV.Program
