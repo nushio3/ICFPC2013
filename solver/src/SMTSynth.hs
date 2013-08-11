@@ -268,24 +268,12 @@ genProgram myFlags oprs size = do
   opid (Shr 16) $ \i j k -> i ./= 0 &&& i ./= 1
 
   when (myFlags ^. bonusMode) $ do
-    forM_ [offs .. size+offs-1] $ \instAddr -> do
-      let weakSum :: SWord8 -> SWord8 -> SWord8
-          weakSum x y = 
-            ite (x.==0 &&& y.==0) 0
-              (ite (x.==0 &&& y.==1 ||| x.==1 &&& y.==0) 1 2)
-      constrain $  
-        (.<2) $
-        foldr1 weakSum $
-        map (\x -> ite (x.==fromIntegral instAddr) 1 0) $ 
-        concat argss
-
     let lastOpcI  = length opcs - 1
         lastOpcI2 = length opcs - 2
         
         lastAdrI  = length opcs - 1 + offs
         lastAdrI2 = length opcs - 2 + offs
         
-    {-
     let    
         white = 0 :: SWord8
         red   = 1 :: SWord8
@@ -317,7 +305,6 @@ genProgram myFlags oprs size = do
     
     forM_ (zip3 [offs..] (candColorThm varColors) opcs) $ \(ln, candThms, opc) ->
          constrain $ (varColors !! ln) `darker` (select candThms 0 opc)
--}
     
     case findIndex (==If0) oprs of
       Nothing ->  error "Bonus problem without If0 \\(>_<)/"  
@@ -443,7 +430,7 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
   
   let oprs = catMaybes $ map toOp ops
   let size = (max 1 $ (ss + adj - sum (map pred $ map argNum oprs)))
-       + (if myFlags ^. bonusMode then 10 else 0)
+       + (if myFlags ^. bonusMode then 0 else 0)
   putStrLn $ "Start synthesis: " ++ T.unpack ident ++ " " ++ show ss ++ " (" ++ show size ++ "), " ++ show ops
   when isTFold $ putStrLn "TFold Mode (>_<);;"
 
