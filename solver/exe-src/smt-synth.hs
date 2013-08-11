@@ -47,6 +47,8 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
         isTFoldProb = elem "tfold". problemOperators
         isFoldProb = elem "fold". problemOperators
 
+        
+
     forM_ (sortBy (compare `on` problemSize) problems) $ \p -> do
       when (isSolved p /= Just True && timeLeft p /= Just 0) $ do
         synth (read cpu) (problemSize p) (problemOperators p) (problemId p)
