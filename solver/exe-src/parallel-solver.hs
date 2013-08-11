@@ -57,7 +57,7 @@ genLambda t = do
                         else do
                             atomically $ writeTVar (guessCandidate given) $ at p ?~ 1 $ m 
                 cs -> do
-                    atomically $ modifyTVar (examples given) $ flip (foldr (\i -> ix i . _1 +~ 1)) cs
+                    atomically $ modifyTVar (examples given) $ flip (foldr (\i -> ix i . _1 +~ 3)) cs
         Nothing -> return ()
 
 judgement :: Given Environment => IO ()
@@ -101,10 +101,10 @@ remainingTime = do
     t <- getCurrentTime
     return $ 60 * 5 - realToFrac (diffUTCTime t (startTime given))
 
-tooLarge :: Int -> [a] -> Bool
-tooLarge 0 (_:xs) = False
-tooLarge n (_:xs) = tooLarge (n - 1) xs
-tooLarge n [] = True
+notTooLarge :: Int -> [a] -> Bool
+notTooLarge 0 (_:xs) = False
+notTooLarge n (_:xs) = notTooLarge (n - 1) xs
+notTooLarge n [] = True
 
 manufactur :: (Given API.Token, Given Environment) => IO ()
 manufactur = do
@@ -134,20 +134,18 @@ manufactur = do
             putStrLn "guess"
             gsc <- atomically $ readTVar (guessCandidate given)
             let (p, _) = maximumBy (compare `on` view _2) (Map.toList gsc)
-            when (tooLarge 1000 p) $ do
+            when (notTooLarge 1000 p) $ do
                 API.guess (API.Guess (theId given) (T.pack p)) >>= \case
                     API.GuessResponse API.GuessWin _ _ -> putStrLn "Won!" >> kill'em_all >> exitSuccess
                     API.GuessResponse API.GuessError _ (Just msg) -> putStrLn (T.unpack msg) >> kill'em_all >> exitSuccess
                     API.GuessResponse API.GuessMismatch (Just vs) _ -> do
                         addExample [(read $ T.unpack $ vs ^?! ix 0, 1000, read $ T.unpack $ vs ^?! ix 1)]
-                atomically $ modifyTVar (guessCandidate given) $ at p .~ Nothing
-                putStrLn "guess:Done."
-
+            atomically $ modifyTVar (guessCandidate given) $ at p .~ Nothing
 addExample :: Given Environment => [(BitVector, Double, BitVector)] -> IO ()
 addExample xs = do
     forM_ xs $ \(i, w, o) -> atomically $ modifyTVar (examples given) $ at i ?~ (w, o)
+    removeTrivial
     forkIO $ judgement
-    forkIO $ removeTrivial
     return ()
     
 oracleSummoner :: (Given API.Token, Given Environment) => IO ()
@@ -163,7 +161,7 @@ oracleSummoner = forever $ do
 trainer :: Given Environment => IO ()
 trainer = forever $ do
     forkIO $ revealDistinguisher
-    threadDelay $ 6 * 1000 * 1000
+    threadDelay $ 5 * 1000 * 1000
 
 trainProblem :: Given API.Token => Int -> IO (T.Text, Int, [String])
 trainProblem level = do
@@ -192,7 +190,7 @@ main = getArgs >>= \case
                 }
         print (size, ops)
         (give env :: (Given Environment => IO ()) => IO ()) $ do
-            replicateM_ 4 $ spawn 10
+            replicateM_ 4 $ spawn 7
             replicateM_ 4 $ spawn 19
             forkKillme trainer
             oracleSummoner
@@ -216,6 +214,9 @@ spawn t = forkKillme $ forever $ do
 
 z3Slayer = do
     procs <- map words <$> lines <$> readProcess "/bin/ps" [] ""
-    forM_ (map (!!0) $ filter (elem "<defunct>") procs) $ \pid -> do
-	putStrLn $ "kill " ++ pid
-	system $ "kill " ++ pid
+    forM_ (filter (elem "<defunct>") procs) $ \case
+      (pid:_) -> do
+	putStrLn $ "kill -9 " ++ pid
+	system $ "kill -9 " ++ pid
+        return ()
+      _ -> return ()
