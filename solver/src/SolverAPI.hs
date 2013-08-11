@@ -48,7 +48,7 @@ satLambda (Input flags probsize ops weight examples) =
 
 sampleInput :: Input
 sampleInput =
-  Input (SpecialFlags False False 0) 2 ["plus", "if0"] 60 [
+  Input (SpecialFlags False False False 0) 2 ["plus", "if0"] 60 [
     InputExample 0 1.361 1,
     InputExample 3 1.361 6
     ]
