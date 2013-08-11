@@ -16,6 +16,7 @@ import Data.List
 import Data.List.Split
 import Control.Concurrent.Async
 import System.Cmd
+import Control.Monad.Trans
 
 import API
 import qualified RichBV as BV
@@ -225,6 +226,12 @@ genProgram myFlags oprs size = do
   opcs <- sWord8s [ printf "opc-%d" i | i <- take size [offs ..] ]
   constrain $ bAll (`inRange` (0, fromIntegral $ length oprs-1)) opcs
 
+  let costs = map (literal . fromIntegral . argNum) oprs
+
+  b <- liftIO $ randomIO
+  when b $
+    constrain $ sum [ select costs (1 :: SInt8) opc | opc <- opcs ] - (literal $ fromIntegral $ length oprs) .<= (literal $ fromIntegral size)
+
   argss <- forM (take size [offs ..]) $ \ln -> do
     args <- sWord8s [ printf "arg-%d-%d" ln i | i <- [0::Int ..2] ]
     constrain $ bAll (.< (literal $ fromIntegral ln)) args
@@ -404,6 +411,7 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
           Nothing -> do
             putStrLn "Accepted: yatapo-(^_^)!"
             system "wget http://botis.org:9999/play/VEC1%20FX%20081.wav -O /dev/null"
+            return ()
           Just oo -> do
             putStrLn $ "distinct: " ++ show oo
             go (oo:es)
