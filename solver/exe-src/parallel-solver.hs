@@ -86,8 +86,8 @@ revealDistinguisher = do
         b = ps !! j
     equivNeq (enrichProgram $ readProgram $ fst a) (enrichProgram $ readProgram $ fst b) >>= \case 
         Just counter -> do
-            atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 1
-            atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 1
+            atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 70
+            atomically $ modifyTVar' (evalCandidate given) $ at counter ?~ 70
         Nothing -> do
             if snd a < snd b
                 then atomically $ modifyTVar' (guessCandidate given) $ at (fst a) .~ Nothing
@@ -118,21 +118,20 @@ manufactur = do
     where
         eval = do
             print "eval"
-            (es', rest) <- fmap (splitAt 256 . sortBy (flip (compare `on` view _2)) . Map.toList)
+            es' <- fmap (take 256 . sortBy (flip (compare `on` view _2)) . Map.toList)
                 $ atomically $ readTVar (evalCandidate given)
-            atomically $ writeTVar (evalCandidate given) $ Map.fromAscList rest
             let es = map fst es'
             is <- (es++) <$> replicateM (256 - length es) randomIO
 
             API.eval (API.EvalRequest (Just $ theId given) Nothing (map (T.pack . printf "0x%016X") is)) >>= \case
-                API.EvalResponse API.EvalOk (Just os) _ -> addExample $ zip3 is (replicate (length es)  xs) os
+                API.EvalResponse API.EvalOk (Just os) _ -> addExample $ zip3 is (replicate (length es) 70 ++ repeat 60) os
                 API.EvalResponse API.EvalError _ (Just msg) -> putStrLn (T.unpack msg)
             putStrLn "eval: Done."
         guess = do
             putStrLn "guess"
             gsc <- atomically $ readTVar (guessCandidate given)
             let (p, _) = maximumBy (compare `on` view _2) (Map.toList gsc)
-            when (tooLarge p 1000) $ do
+            when (tooLarge 1000 p) $ do
                 API.guess (API.Guess (theId given) (T.pack p)) >>= \case
                     API.GuessResponse API.GuessWin _ _ -> putStrLn "Won!" >> kill'em_all >> exitSuccess
                     API.GuessResponse API.GuessError _ (Just msg) -> putStrLn (T.unpack msg) >> kill'em_all >> exitSuccess
