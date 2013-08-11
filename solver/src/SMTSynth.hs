@@ -314,7 +314,6 @@ genProgram myFlags oprs size = do
 
 findProgram :: Int -> SpecialFlags -> [Opr] -> Int -> [(Word64, Word64)] -> IO Program
 findProgram seed myFlags oprs size samples = do
-  putStrLn $ "inputs: " ++ show samples
   let c = do
         (opcs, argss) <- genProgram myFlags oprs size
         forM_ samples $ \(i, o) ->
@@ -408,6 +407,7 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
 
   let go es add = do
         -- putStrLn "behave..."
+        putStrLn $ "inputs: " ++ show (add ++ es)
         progn <- para cpuNum $ \i -> findProgram i myFlags oprs size $ add ++ es
         system "pkill z3"
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram myFlags oprs progn)
