@@ -3,8 +3,10 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404
 from django.template import RequestContext, loader
 
-import problems.models
 import time
+import urllib
+
+import problems.models
 
 # Create your views here.
 
@@ -92,18 +94,24 @@ def index(request):
     return render(request, 'problems/list.html', context)
 
 
+def GetIndexUrlFromRequest(request):
+    return '/problems/?' + urllib.urlencode({'with': request.POST.get('with'),
+                                             'without': request.POST.get('without')})
+
+
 def reload(request):
     """Force refresh problem list."""
     problems.models.ForceReload()
-    return HttpResponseRedirect(reverse('problems:index'))
+    return HttpResponseRedirect(GetIndexUrlFromRequest(request))
 
 
 def setreload(request, status):
     """Force refresh problem list."""
     problems.models.SetAutoLoadStatus(status == 'True')
-    return HttpResponseRedirect(reverse('problems:index'))
+    return HttpResponseRedirect(GetIndexUrlFromRequest(request))
 
 
 def maybereload(request):
     problems.models.MaybeAutoLoad()
-    return HttpResponseRedirect(reverse('problems:index'))
+    return HttpResponseRedirect(GetIndexUrlFromRequest(request))
+
