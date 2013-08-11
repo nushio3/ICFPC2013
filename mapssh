@@ -7,7 +7,13 @@ import Text.Printf
 
 main :: IO ()
 main = do
-  argv <- getArgs
+  (para:rangeStr:argv) <- getArgs
+  let indices :: [Int]
+      indices = [a..b]
+      (a,b) = read rangeStr
+      
+  
   ec2s <- fmap (map (unwords.words) . lines )$ readFile "ec2-instances"
-  forM_ ec2s $ \url -> do
-    printf "ssh -i oregon-jkey.pem ubuntu@%s '%s'\n" url $ unwords argv
+  forM_ [ec2s!!i | i <- indices] $ \url -> do
+    printf "ssh -i oregon-jkey.pem ubuntu@%s '%s'%s\n" url (unwords argv)
+      (if para=="P" then " &" else "")
