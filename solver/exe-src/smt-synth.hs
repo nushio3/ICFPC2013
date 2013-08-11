@@ -195,9 +195,9 @@ distinct oprs size samples (oopcs, oargss) = do
         i <- sWord64 "distinctInput"
         o0 <- sWord64 "distinctOutput0"
         o1 <- sWord64 "distinctOutput1"
-        constrain $ o0 ./= o1
         behave oprs size (map literal oopcs) (map (map literal) oargss) i o0
         behave oprs size opcs argss i o1
+        constrain $ o0 ./= o1
 
         return (true :: SBool)
 
@@ -261,9 +261,9 @@ synth size ops ident = do
 
   let go e = do
         putStrLn "behave..."
-        progn <- findProgram oprs (size-1) e
+        progn <- findProgram oprs size e
         putStrLn $ "found: " ++ show progn
-        a <- distinct oprs (size-1) e progn
+        a <- distinct oprs size e progn
         putStrLn $ "distinct: " ++ show a
         case a of
           Nothing -> putStrLn $ "Answer found!!: " ++ show progn
@@ -278,6 +278,6 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
   ("training" : level : _) -> do
     TrainingProblem prog ident size ops <- train $ TrainRequest (read level) []
     putStrLn $ "Expected answer: " ++ T.unpack prog
-    synth size ops ident
+    synth (size - 2) ops ident
   _ -> do
     undefined
