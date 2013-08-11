@@ -160,7 +160,6 @@ satLambda  probSize opStrs weight exampleMap = do
     
 parseSBVOutput :: String -> IO (Maybe String)
 parseSBVOutput outputStr = do
-  mapM_ print $ Map.toList satMap
   return $ Just $ printProgram $ enrichProgram $ BV.Program "x" $ expand rootEdge
   where
     expand :: VarEdge -> BV.Expr
