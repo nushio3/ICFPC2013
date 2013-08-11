@@ -26,8 +26,7 @@ import BV (BitVector)
 import qualified API
 import qualified Data.Map as Map
 import Network.HTTP.Conduit
-import qualified WrapSMTSynth
-import SMTSynth hiding (Program)
+import qualified RemoteSolver
 import Z3Slayer
 
 data Environment = Environment
@@ -193,7 +192,7 @@ solveAndAnswer ident size ops w1 w2 w3 ratio = do
             , startTime = t
             , theId = ident
             , strictness = ratio
-            , theSatLambdas = [WrapSMTSynth.satLambda flags size ops]
+            , theSatLambdas = [RemoteSolver.satLambdaRemote flags size ops]
             , _DEATH_NOTE = deathNote
             }
     print (size, ops)
