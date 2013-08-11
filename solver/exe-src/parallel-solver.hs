@@ -220,7 +220,7 @@ spawn t = forkKillme $ forever $ do
     forkKillme $ timeout (floor $ t * 2 * 1000 * 1000) (genLambda t) >>= \case
         Nothing -> z3Slayer >> putStrLn "Spawning: Failed."
         Just _ -> putStrLn "Spawning: Done."
-    threadDelay $ 10 * 1000 * 1000
+    threadDelay $ 10 * 10^6
 
 z3Slayer = do
     procs <- map words <$> lines <$> readProcess "/bin/ps" [] ""
