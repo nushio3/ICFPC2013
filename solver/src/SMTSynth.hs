@@ -3,7 +3,7 @@ module SMTSynth where
 
 import Data.SBV
 import System.Random
-import Control.Lens ((&), (^.), (.~))
+import Control.Lens ((&), (^.), (.~), (%~))
 import Control.Lens.TH
 import Control.Monad
 import Data.Reflection
@@ -16,6 +16,7 @@ import Data.List
 import Data.List.Split
 import Control.Concurrent.Async
 import System.Cmd
+import System.IO.Unsafe
 import Control.Monad.Trans
 
 import API
@@ -23,13 +24,15 @@ import qualified RichBV as BV
 
 data SpecialFlags = SpecialFlags
   { _bonusMode :: Bool
-  , _tfoldMode :: Bool }
+  , _tfoldMode :: Bool
+  , _foldMode  :: Bool
+  , _randomSeed :: Int}
   deriving (Eq, Ord, Read, Show)  
 
 $(makeLenses ''SpecialFlags)
 
 defaultSpecialFlags :: SpecialFlags
-defaultSpecialFlags = SpecialFlags False False 
+defaultSpecialFlags = SpecialFlags False False False $ unsafePerformIO $ randomRIO (0, 16383)
 
 -- TODO: support fold
 -- if0, not, shl1, shr1, shr4, shr16, and, or, xor, plus
@@ -50,75 +53,12 @@ oracleDistinct ident p = do
     GuessMismatch -> case gval of
       Just [i, o, _myo] ->
         return $ Just (read $ T.unpack i, read $ T.unpack o)
-      _ ->
-        fail "tsurapoyo('_`)"
-    GuessError -> fail $ show gmsg
-
---valid :: [SWord8] -> SBool
---valid oprs = go 0 oprs (0 :: SInt8) where
---  go _ [] s = s .== 1
---  go xx (opr:rest) s = ite (s .< xx) false $ go 1 rest (select rs 0 opr) where
---    rs =
---      [ s
---      , s + 1, s + 1, s + 1
---      , s - 2
---      , s, s, s, s, s
---      , s - 1, s - 1, s - 1, s - 1
---      ]
-
---interp :: [SWord8] -> SWord64 -> SWord64
---interp oprs i = go oprs $ replicate maxlen 0 where
---  maxlen = length oprs
---  go [] (v:_) = v
---  go (opr:rest) ss = ite (opr .== $ go rest $
---    ite (opr .== 1 ) (take maxlen $ 0:ss) $ -- const 0
---    ite (opr .== 2 ) (take maxlen $ 1:ss) $ -- const 1
---    ite (opr .== 3 ) (take maxlen $ i:ss) $ -- var
---    ite (opr .== 4 ) ((case splitAt 3 ss of ([c,t,e], sss) -> ite (c.==0) t e:sss++[0,0]; _ -> ss)) $ -- if0
---    ite (opr .== 5 ) ((case splitAt 1 ss of ([x], sss) -> complement x:sss; _ -> ss)) $ -- not
---    ite (opr .== 6 ) ((case splitAt 1 ss of ([x], sss) -> x `shiftL` 1:sss; _ -> ss)) $ -- shl1
---    ite (opr .== 7 ) ((case splitAt 1 ss of ([x], sss) -> x `shiftR` 1:sss; _ -> ss)) $ -- shr1
---    ite (opr .== 8 ) ((case splitAt 1 ss of ([x], sss) -> x `shiftR` 4:sss; _ -> ss)) $ -- shr4
---    ite (opr .== 9 ) ((case splitAt 1 ss of ([x], sss) -> x `shiftR` 16:sss; _ -> ss)) $ -- shr16
---    ite (opr .== 10) ((case splitAt 2 ss of ([x, y], sss) -> (x .&. y) : sss++[0]; _ -> ss)) $ -- and
---    ite (opr .== 11) ((case splitAt 2 ss of ([x, y], sss) -> (x .|. y) : sss++[0]; _ -> ss)) $ -- or
---    ite (opr .== 12) ((case splitAt 2 ss of ([x, y], sss) -> (x `xor` y) : sss++[0]; _ -> ss)) $ -- xor
---    ite (opr .== 13) ((case splitAt 2 ss of ([x, y], sss) -> (x + y) : sss++[0]; _ -> ss)) $ -- plus
---    ss
-
---behave :: Int -> Int -> [(Word64, Word64)] -> IO [Word8]
---behave size opc samples = do
---  generateSMTBenchmarks True "test" $ do
---    oprs <- mkExistVars size
---    mapM_ (\opr -> constrain $ opr .<= 13) oprs
---    constrain $ valid oprs
---    mapM_ (\(i, o) -> constrain $ interp oprs (literal i) .== literal o) samples
---    return (true :: SBool)
---  fail "hoge"
-
---  ret <- sat $ do
---    oprs <- mkExistVars size
---    mapM_ (\opr -> constrain $ opr .<= 13) oprs
---    constrain $ valid oprs
---    mapM_ (\(i, o) -> constrain $ interp oprs (literal i) .== literal o) samples
---    return (true :: SBool)
---  case getModel ret of
---    Right (_, v) -> return v
---    Left err -> fail err
-
---distinct :: Int -> Int -> [(Word64, Word64)] -> [Word8] -> IO (Maybe Word64)
---distinct size opc samples l = do
---  ret <- sat $ do
---    oprs <- mkExistVars size
---    mapM_ (\opr -> constrain $ opr .<= 13) oprs
---    constrain $ valid oprs
---    mapM_ (\(i, o) -> constrain $ interp oprs (literal i) .== literal o) samples
---    i <- exists_
---    constrain $ interp oprs i ./= interp (map literal l) i
---    return (true :: SBool)
---  case getModel ret of
---    Right (_, v) -> return $ Just v
---    Left _ -> return Nothing
+      _ -> do
+        putStrLn "tsurapoyo('_`)"
+        return Nothing
+    GuessError -> do
+      putStrLn $ show gmsg
+      return Nothing
 
 instance Applicative Symbolic where
   pure = return
@@ -126,9 +66,6 @@ instance Applicative Symbolic where
     f <- a
     x <- b
     return $ f x
-
---type Addr = SWord16
---type Val = SWord64
 
 data Opr = If0 | Not | Shl Int | Shr Int | And | Or | Xor | Plus 
   deriving (Eq, Show)
@@ -144,47 +81,11 @@ argNum opr = case opr of
   Xor   -> 2
   Plus  -> 2
 
---data Alloc a = Alloc { _aOut :: a, _aArg :: [a] }
-
---allocs :: Alloc a -> [a]
---allocs (Alloc a is) = a : is
-
---behave :: [Opr]
---       -> [Alloc Addr]
---       -> [(Word64, Word64)]
---       -> Symbolic SBool
---behave oprs locs samples = do
---  forM_ samples $ \(i, o) ->
---    phiFunc i o
---  return true
-
---  where
---    len = length oprs
-
---    phiFunc :: Word64 -> Word64 -> Symbolic ()
---    phiFunc i o = do
---      vars@(v0:v1:v2:_) <- mapM (mkAlloc $ sWord64 "var") oprs
---      constrain $ _aOut v0 .== 0
---      constrain $ _aOut v1 .== 1
---      constrain $ _aOut v2 .== literal i
---      forM_ (zip locs vars) $ \(loc, var) -> do
---        constrain $ ite (_aOut loc .== literal (fromIntegral len - 1)) (_aOut var .== literal o) true
---      forM_ (zip oprs vars) $ \(opr, var) ->
---        constrain $ oprSat opr var
-
---      let as = zip (concatMap allocs locs) (concatMap allocs vars)
---      liftIO $ print $ length as
---      let conss = [ (a .== c) ==> (b .== d)
---                  | (i, (a, b)) <- zip [0..] as
---                  , (j, (c, d)) <- zip [0..] as
---                  , i < j ]
---      mapM_ constrain conss
-
 type SLoc = SWord8
 type Loc = Word8
 
-behave :: SpecialFlags -> [Opr] -> Int -> [SLoc] -> [[SLoc]] -> SWord64 -> SWord64 -> Symbolic ()
-behave myFlags oprs size opcs argss i o = do
+behave :: SpecialFlags -> [Opr] -> Int -> [SLoc] -> [[SLoc]] -> SWord8 -> SWord64 -> SWord64 -> Symbolic ()
+behave myFlags oprs size opcs argss bdr i o = do
   let offs = if myFlags^.tfoldMode then 4 else 3 :: Int
 
   let candss vars = flip map argss $ \[x, y, z] ->
@@ -209,15 +110,31 @@ behave myFlags oprs size opcs argss i o = do
       constrain $ last vars   .== o
       forM_ (zip3 [offs..] (candss vars) opcs) $ \(ln, cands, opc) ->
         constrain $ vars !! ln .== select cands 0 opc
-    else do
+
+    else if not $ myFlags^.foldMode then do
       let go [] acc = constrain $ acc .== o
           go (x:xs) acc = do
             vars <- ([0,1,x,acc]++) <$> sWord64s [ printf "var-%d" ln | ln <- [0::Int ..size-1]]
             forM_ (zip3 [offs..] (candss vars) opcs) $ \(ln, cands, opc) ->
               constrain $ vars !! ln .== select cands 0 opc
             go xs (last vars)
-
       go [ (i `shiftR` (8*s)) .&. 0xff | s <- [0..7]] 0
+
+      else do
+        vars <- ([0,1,i,0]++) <$> sWord64s [ printf "var-%d" ln | ln <- [0::Int ..size-1]]
+        let var ix = select vars 0 ix
+            a = var (bdr - 2)
+            b = var (bdr - 1)
+        forM_ (zip3 [4..] (candss vars) opcs) $ \(ln, cands, opc) ->
+          constrain $ vars !! ln .== select cands 0 opc
+
+        let go [] acc = constrain $ acc .== o
+            go (x:xs) acc = do
+              vars <- ([0,1,x,acc]++) <$> sWord64s [ printf "var-%d" ln | ln <- [0::Int ..size-1]]
+              forM_ (zip3 [4..] (candss vars) opcs) $ \(ln, cands, opc) ->
+                constrain $ vars !! ln .== select cands 0 opc
+              go xs (last vars)
+        go [ (a `shiftR` (8*s)) .&. 0xff | s <- [0..7]] b
 
 genProgram :: SpecialFlags -> [Opr] -> Int -> Symbolic SProgram
 genProgram myFlags oprs size = do
@@ -226,16 +143,18 @@ genProgram myFlags oprs size = do
   opcs <- sWord8s [ printf "opc-%d" i | i <- take size [offs ..] ]
   constrain $ bAll (`inRange` (0, fromIntegral $ length oprs-1)) opcs
 
-  --let costs = map (literal . fromIntegral . argNum) oprs
-
-  --b <- liftIO $ randomIO
-  --when b $
-  --  constrain $ sum [ select costs (1 :: SInt8) opc | opc <- opcs ] - (literal $ fromIntegral $ length oprs) .<= (literal $ fromIntegral size)
-
   argss <- forM (take size [offs ..]) $ \ln -> do
     args <- sWord8s [ printf "arg-%d-%d" ln i | i <- [0::Int ..2] ]
     constrain $ bAll (.< (literal $ fromIntegral ln)) args
     return args
+
+  border <- sWord8 "border"
+  constrain $ inRange border (fromIntegral offs+2, fromIntegral $ offs + length argss - 1)
+
+  -- TODO:
+  --when (myFlags ^. foldMode) $ do
+  --  forM_ (zip [offs..] argss) $ \(ln, args) -> do
+  --    constrain $ bAll (\loc -> ln .>= .< (literal $ fromIntegral ln)) args
 
   -- remove trivial cases
   let opid opr f = case findIndex (==opr) oprs of
@@ -248,14 +167,13 @@ genProgram myFlags oprs size = do
   -- (if0 0 _) and (if0 1 _) is redundant
   opid If0 $ \i j k -> i ./= 0 &&& i ./= 1 &&& j .< k
 
-  -- (and 0 _) (and _ 0)
-  -- (and c c)
+  -- (and 0 _) (and _ 0) (and c c)
   opid And $ \i j k -> i ./= 0 &&& j ./= 0 &&& (i .> 1 ||| j .> 1) &&& i .< j
 
-  -- (or 0 _) and (or _ 0)
+  -- (or 0 _) (or _ 0) (or c c)
   opid Or  $ \i j k -> i ./= 0 &&& j ./= 0 &&& (i .> 1 ||| j .> 1) &&& i .< j
 
-  -- (xor 0 _) and (xor _ 0)
+  -- (xor 0 _) (xor _ 0) (xor c c)
   opid Xor $ \i j k -> i ./= 0 &&& j ./= 0 &&& (i .> 1 ||| j .> 1) &&& i .< j
 
   -- (plus 0 _) (plus _ 0) (plus i j) i >= j
@@ -287,7 +205,6 @@ genProgram myFlags oprs size = do
     forM_ (drop offs varColors) $ 
       (\c -> constrain $ (c .== red) ||| (c.== green) ||| (c.==blue))
         
-      
     let candColorThm vars = flip map argss $ \[x, y, z] ->
           let var ix = select varColors 0 ix
               vx = var x
@@ -317,7 +234,7 @@ genProgram myFlags oprs size = do
         constrain $ (argss !! lastOpcI !! 0) .== fromIntegral lastAdrI2
         constrain $ (argss !! lastOpcI2!! 0) .== 1
 
-  return (opcs, argss)
+  return (opcs, argss, border)
 
 --distinct :: [Opr] -> Int -> [(Word64, Word64)] -> Program -> IO (Maybe Word64)
 --distinct oprs size samples (oopcs, oargss) = do
@@ -340,30 +257,30 @@ genProgram myFlags oprs size = do
 --  generateSMTBenchmarks True "distinct" c
 --  return $ fmap read $ lookup "distinctInput" $ parseRes $ show res
 
-findProgram :: Int -> SpecialFlags -> [Opr] -> Int -> [(Word64, Word64)] -> IO Program
-findProgram seed myFlags oprs size samples = do
+findProgram :: SpecialFlags -> [Opr] -> Int -> [(Word64, Word64)] -> IO Program
+findProgram myFlags oprs size samples = do
   let c = do
-        (opcs, argss) <- genProgram myFlags oprs size
+        (opcs, argss, bdr) <- genProgram myFlags oprs size
         forM_ samples $ \(i, o) ->
-          behave myFlags oprs size opcs argss (literal i) (literal o)
+          behave myFlags oprs size opcs argss bdr (literal i) (literal o)
         return (true :: SBool)
   -- generateSMTBenchmarks True "find" c
-  res <- satWith (z3 {solver=(solver z3) {options=options (solver z3) ++ ["smt.random_seed="++show seed]}}) c
-  
+  res <- satWith (z3 {solver=(solver z3) {options=options (solver z3) ++ ["smt.random_seed="++show (myFlags ^. randomSeed)]}}) c
   -- print res
   return $ parseProgram (myFlags^.tfoldMode) $ show res
 
-type Program  = ([Loc],  [[Loc]])
-type SProgram = ([SLoc], [[SLoc]])
+type Program  = ([Loc],  [[Loc]], Loc)
+type SProgram = ([SLoc], [[SLoc]], SLoc)
 
 parseRes :: String -> [(String, String)]
 parseRes ss = [ (nam, val) | (nam: "=": val: _) <- map words $ lines ss ]
 
 parseProgram :: Bool -> String -> Program
-parseProgram isTFold ss = (opcs, argss) where
+parseProgram isTFold ss = (opcs, argss, bdr) where
   offs = if isTFold then 4 else 3 :: Int
   opcs  = map read $ catMaybes $ takeWhile isJust [ lookup ("opc-" ++ show i) mm | i <- [offs ..] ]
   argss = chunksOf 3 $ map read $ catMaybes $ takeWhile isJust [ lookup ("arg-" ++ show i ++ "-" ++ show j) mm | i <- [offs ..], j <- [0::Int ..2] ]
+  bdr   = read $ fromJust $ lookup "border" mm
   mm    = parseRes ss
 
 toOp :: T.Text -> Maybe Opr
@@ -380,13 +297,17 @@ toOp "if0"   = Just If0
 toOp _       = Nothing
 
 toProgram :: SpecialFlags -> [Opr] -> Program -> BV.Program
-toProgram myFlags oprs (opcs, argss) =
+toProgram myFlags oprs (opcs, argss, bdr) =
   if not $ myFlags^.tfoldMode
     then BV.Program $ last ee
-    else BV.Program $ BV.Fold 1 2 (BV.Var 0) (BV.Constant 0) $ last ff
+    else if not $ myFlags^.foldMode
+      then BV.Program $ BV.Fold 1 2 (BV.Var 0) (BV.Constant 0) $ last ff
+      else BV.Program $ BV.Fold 1 2 (ee' !! (fromIntegral $ bdr - 2)) (ee' !! (fromIntegral $ bdr - 1)) $ last ff
  where
   ee = [BV.Constant 0, BV.Constant 1, BV.Var 0] ++
        [ toExp ee (oprs !! fromIntegral opc) $ map fromIntegral args | (opc, args) <- zip opcs argss ]
+  ee'= [BV.Constant 0, BV.Constant 1, BV.Var 0, BV.Constant 0] ++
+       [ toExp ee' (oprs !! fromIntegral opc) $ map fromIntegral args | (opc, args) <- zip opcs argss ]
   ff = [BV.Constant 0, BV.Constant 1, BV.Var 1, BV.Var 2] ++
        [ toExp ff (oprs !! fromIntegral opc) $ map fromIntegral args | (opc, args) <- zip opcs argss ]
 
@@ -410,12 +331,14 @@ para n m = foldl1 rac $ map m [0..n-1] where
       Right v -> return v
 
 synth :: Given Token => Int -> Int -> [T.Text] -> T.Text -> IO ()
-synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use fold (>_<)" else do
-  let (ops, adj, isTFold)
-        | "fold" `elem` ops' || "tfold" `elem` ops' =
-          (ops' \\ ["tfold"], -6, True)
+synth cpuNum ss ops' ident = do
+  let (ops, adj, isTFold, isFold)
+        | "tfold" `elem` ops' =
+          (ops' \\ ["tfold", "fold"], -5, True, False)
+        | "fold" `elem` ops' =
+          (ops' \\ ["tfold", "fold"], -5, False, True)
         | otherwise =
-          (ops', -2, False)
+          (ops', -2, False, False)
 
   i0 <- map (\x -> x `div` 2 * 2) <$> replicateM 128 randomIO
   i1 <- map (\x -> x `div` 2 * 2 + 1) <$> replicateM 128 randomIO
@@ -426,19 +349,24 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
   let 
     myFlags = defaultSpecialFlags
       & bonusMode .~ ("bonus" `elem` ops')
-      & tfoldMode .~ ("tfold" `elem` ops')
+      & tfoldMode .~ ("tfold" `elem` ops' || "fold"  `elem` ops')
+      & foldMode  .~ ("fold"  `elem` ops')
   
   let oprs = catMaybes $ map toOp ops
   let size = (max 1 $ (ss + adj - sum (map pred $ map argNum oprs)))
        + (if myFlags ^. bonusMode then 0 else 0)
   putStrLn $ "Start synthesis: " ++ T.unpack ident ++ " " ++ show ss ++ " (" ++ show size ++ "), " ++ show ops
   when isTFold $ putStrLn "TFold Mode (>_<);;"
+  when isFold  $ putStrLn "Fold Mode (;_;) tsurai..."
+
+  seeds <- replicateM cpuNum randomIO
 
   let go es = do
         -- putStrLn "behave..."
         putStrLn $ "inputs: " ++ show es
-        progn <- para cpuNum $ \i -> findProgram i myFlags oprs (size + i `mod` 3) $ take 5 es
+        progn <- para cpuNum $ \i -> findProgram (myFlags&randomSeed.~((abs $ (seeds::[Int]) !! i)`mod`65536)) oprs (size + i `mod` 3) $ take 5 es
         system "pkill z3"
+        -- print progn
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram myFlags oprs progn)
         o <- oracleDistinct ident $ toProgram myFlags oprs progn
         case o of

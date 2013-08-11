@@ -32,6 +32,7 @@ library
     WrapSMTSynth
     SolverAPI
     Z3Slayer
+    RemoteSolver
 
 
   hs-source-dirs:    src/  
@@ -59,6 +60,7 @@ library
     , vector
     , async
     , process
+    , stm
 
   Ghc-Options: -Wall -O2 -threaded
 
@@ -261,5 +263,5 @@ executable solver-api-server
     , text
     , mtl
 
-  buildable: True
+  buildable: False
 
