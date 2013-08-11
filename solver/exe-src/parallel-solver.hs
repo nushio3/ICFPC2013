@@ -138,10 +138,12 @@ manufactur = do
                 API.EvalResponse API.EvalOk (Just os) _ -> addExample $ zip3 is (replicate (length es) 70 ++ repeat 60) os
                 API.EvalResponse API.EvalError _ (Just msg) -> putStrLn (T.unpack msg)
         guess = do
-            putStrLn "guess"
             gsc <- atomically $ readTVar (guessCandidate given)
             let (p, _) = maximumBy (compare `on` view _2) (Map.toList gsc)
             when (notTooLarge 1000 p) $ do
+                putStrLn "************************************"
+                putStrLn $ "     guess " ++ p
+                putStrLn "************************************"
                 API.guess (API.Guess (theId given) (T.pack p)) >>= \case
                     API.GuessResponse API.GuessWin _ _ -> do
                         putStrLn "Won!"
