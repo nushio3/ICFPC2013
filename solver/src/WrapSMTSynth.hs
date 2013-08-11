@@ -13,6 +13,6 @@ import RichBV
 satLambda :: SpecialFlags -> Int -> [String] -> Double -> Map.Map BitVector (Double, BitVector) -> IO (Maybe String)
 satLambda flags size ops t example = do
     let ops' = catMaybes $ map (SMTSynth.toOp . T.pack) ops
-    exs <- sampleExample (floor $ max 2 $ t / fromIntegral (length ops * size)) example
+    exs <- sampleExample (floor $ max 2 $ t / fromIntegral (sqrt $ length ops * size)) example
     r <- try $ findProgram flags ops' size exs :: IO (Either IOException SMTSynth.Program)
     return $ either (const Nothing) (Just . printProgram . toProgram flags ops') r
