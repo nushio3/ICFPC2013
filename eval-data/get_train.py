@@ -12,7 +12,7 @@ import urllib2
 
 def Parse():
     parser = ArgumentParser(description='Collect training programs.')
-    parser.add_argument('--size', type=int, default=42)
+    parser.add_argument('--size', type=int, default=-1)
     parser.add_argument('--previous_input')
     parser.add_argument('--sleep', type=int, default=5)
     parser.add_argument('-n', type=int, default=1)
@@ -24,7 +24,9 @@ def GetTraining(size, operators):
     url = ('http://icfpc2013.cloudapp.net/train?auth=%svpsH1H' %
            '0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0Kj')
     
-    query = {'size': size}
+    query = {}
+    if size > 0:
+        query['size'] = size
     if operators is not None:
         query['operators'] = [operators]
     query_string = json.dumps(query)
