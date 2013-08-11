@@ -6,10 +6,13 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Monad
 import Control.Lens
+import Data.List
+import Data.Function
 import Convert
 import RichBV
 import System.Random
 import System.IO.Unsafe
+import qualified Data.Text as T
 import SRichBV
 import Control.Applicative
 import BV (BitVector)
@@ -90,27 +93,35 @@ remainingTime = do
     t <- getCurrentTime
     return $ realToFrac $ diffUTCTime t (startTime given)
 
-manufactur :: Given Environment => IO ()
+manufactur :: (Given API.Token, Given Environment) => IO ()
 manufactur = do
     t <- remainingTime
     n <- atomically $ readTVar (oracleCount given)
     numEvalCandidate <- fmap Map.size $ atomically $ readTVar (evalCandidate given)
     numGuessCandidate <- fmap Map.size $ atomically $ readTVar (guessCandidate given)
     if
-        | t < 60, odd n -> do
-            -- API.guess
-            return ()
-        | numEvalCandidate >= 256 , numGuessCandidate > 16 -> do
-            -- API.eval
-            return ()
-        | numGuessCandidate == 0 -> do
-            -- API.eval
-            return ()
-        | otherwise -> do
-            -- API.guess
-            return ()
+        | t < 60, odd n -> guess
+        | numEvalCandidate >= 256 , numGuessCandidate > 16 -> eval
+        | numGuessCandidate == 0 -> eval
+        | otherwise -> guess
+    where
+        eval = do
+            (es, rest) <- fmap (splitAt 256 . sortBy (flip (compare `on` view _2)) . Map.toList)
+                $ atomically $ readTVar (evalCandidate given)
+            let is = map fst es
+            API.eval (API.EvalRequest (Just $ API.problemId $ theProblem given) Nothing (map (T.pack . show) is)) >>= \case
+                API.EvalResponse API.EvalOk (Just os) _ -> atomically $ modifyTVar (examples given) $ foldl (.) id (zipWith (\x y -> at x ?~ (1, y)) is os)
+        guess = do
+            gsc <- atomically $ readTVar (guessCandidate given)
+            let (p, _) = maximumBy (compare `on` view _2) (Map.toList gsc)
+            API.guess (API.Guess (API.problemId $ theProblem given) (T.pack p)) >>= \case
+                API.GuessResponse API.GuessWin _ _ -> fail "Won!"
+                API.GuessResponse API.GuessError _ (Just msg) -> fail (T.unpack msg)
+                API.GuessResponse API.GuessMismatch (Just vs) _ -> do
+                    atomically $ modifyTVar (examples given) $ at (read $ T.unpack $ vs ^?! ix 0)
+                        ?~ (1000, read $ T.unpack $ vs ^?! ix 1)
 
-oracleSummoner :: Given Environment => IO ()
+oracleSummoner :: (Given API.Token, Given Environment) => IO ()
 oracleSummoner = forever $ do
     manufactur
     threadDelay $ 4 * 1000 * 1000
@@ -137,7 +148,7 @@ main = do
             , startTime = t
             , theProblem = problem
             }
-    give env $ do
+    give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ give env $ do
         forkIO oracleSummoner
         forkIO trainer
     
