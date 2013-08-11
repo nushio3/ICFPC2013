@@ -33,6 +33,20 @@ data Op = Const Int | Var
         | If0 
                            deriving (Eq, Ord, Show, Read)
 
+toOp :: String -> Op
+toOp "not"   = Not
+toOp "shl1"  = Shl 1
+toOp "shr1"  = Shr 1
+toOp "shr4"  = Shr 4
+toOp "shr16" = Shr 16
+toOp "and"   = And
+toOp "or"    = Or
+toOp "xor"   = Xor
+toOp "plus"  = Plus
+toOp "if0"   = If0
+toOp x = error $ "unknown operator string:" ++ x
+
+
 data VarEdge 
  = OutEdge { edgeKey :: String}
  | InEdge { edgeKey :: String, edgeIdx :: Int}
@@ -122,20 +136,20 @@ progOfSize size0 opList0 = do
   return (thmWfp, LVProgram {-  ret -}  addrLib)
 
 testMain = do
-  satLambda undefined undefined $
+  satLambda 2 ["plus", "if0"] $
     Map.fromList 
       [( 0 , (1.341, 1))
       ,( 3 , (1.341, 6)) ]
 
 satLambda :: Int -> [String] -> Map.Map BitVector (Float, BitVector) -> IO (Maybe String)
-satLambda _ _  exampleMap = do
+satLambda probSize opStrs  exampleMap = do
   let 
     examples :: [(SBitVector, SBitVector)]
     examples = map (both %~ fromIntegral) $ 
                map (_2 %~ snd)$ Map.toList exampleMap
 
   ret <- sat $ do
-    (thmWfp, prog) <- progOfSize 1 [If0, Plus]
+    (thmWfp, prog) <- progOfSize probSize $ map toOp opStrs
   
     thmBehs <- (flip. flip zipWithM) [0..] examples $ \i (a,b) -> 
       phiFunc prog i a b
@@ -242,7 +256,7 @@ phiFunc lvProg exampleIdx alpha beta = do
           (Xor , [a,b])  -> a `xor` b
           (Plus , [a,b]) -> a + b
           (If0, [a,b,c]) -> ite (a .== 0) b c
-          _              -> error $ printf "unsupported operator and arity: %s(%d)"
+          _              -> error $ printf "unsupported operator and arity in phiLib: %s(%d)"
                (show $ opaddr^.inst) (length $ opaddr^.ivars) 
   let allAVs :: [(Addr,Val)]
       allAVs = (fromIntegral (n-1), beta):
