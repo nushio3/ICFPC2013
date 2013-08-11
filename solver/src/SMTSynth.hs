@@ -149,6 +149,11 @@ genProgram myFlags oprs size = do
     constrain $ bAll (.< (literal $ fromIntegral ln)) args
     return args
 
+  b <- liftIO randomIO
+  when b $ do
+    let costs = map (fromIntegral . argNum) oprs
+    constrain $ sum [ select costs 1 opc | opc <- opcs ] - (fromIntegral $ length oprs) .<= (fromIntegral size :: SInt8)
+
   border <- sWord8 "border"
 
   when (myFlags ^. foldMode) $ do
