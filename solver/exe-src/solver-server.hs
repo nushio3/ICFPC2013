@@ -24,7 +24,7 @@ data ServerOptions = ServerOptions
   } deriving (Show, Data, Typeable)
 
 server_options = ServerOptions {
-  port = 10203  &= help "port number",
+  port = 31940  &= help "port number",
   weight = 0 &= help "debug flag to have weight"
   } &= summary "solver server"
 
