@@ -214,6 +214,7 @@ kill'em_all = do
 
 spawn :: Given Environment => Double -> IO ThreadId
 spawn t = forkKillme $ forever $ do
+    putStrLn $ "Spawning: " ++ show t
     timeout (floor $ t * 2 * 1000 * 1000) (genLambda t) >>= \case
         Nothing -> z3Slayer >> putStrLn "Spawning: Failed."
         Just _ -> putStrLn "Spawning: Done."
