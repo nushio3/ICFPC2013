@@ -28,6 +28,7 @@ library
     Gulwani4
     GulwaniHead
     SolverUtil
+    StupidSat
     WrapSMTSynth
 
 
