@@ -3,6 +3,7 @@ import Data.Time
 import Data.Reflection
 import Control.Concurrent
 import Control.Concurrent.STM
+import Control.Exception
 import Control.Monad
 import Control.Lens
 import Data.List
@@ -22,7 +23,7 @@ import System.Timeout
 import BV (BitVector)
 import qualified API
 import qualified Data.Map as Map
-
+import Network.HTTP.Conduit
 import qualified WrapSMTSynth
 
 data Environment = Environment
@@ -44,8 +45,7 @@ findCounterExamples prog = do
 
 genLambda :: Given Environment => Double -> IO ()
 genLambda t = do
-    ratio <- readTVarIO (strictness given)
-    atomically (readTVar (examples given)) >>= head (theSatLambdas given) (t * ratio) >>= \case
+    atomically (readTVar (examples given)) >>= head (theSatLambdas given) t >>= \case
         Just p -> do
             let prog = enrichProgram $ readProgram p
             findCounterExamples prog >>= \case
@@ -121,7 +121,7 @@ manufactur = do
     where
         eval = do
             print "eval"
-            es' <- fmap (take 256 . sortBy (flip (compare `on` view _2)) . Map.toList)
+            es' <- fmap (take 240 . sortBy (flip (compare `on` view _2)) . Map.toList)
                 $ atomically $ readTVar (evalCandidate given)
             let es = map fst es'
             is <- (es++) <$> replicateM (256 - length es) randomIO
@@ -136,16 +136,21 @@ manufactur = do
             let (p, _) = maximumBy (compare `on` view _2) (Map.toList gsc)
             when (notTooLarge 1000 p) $ do
                 API.guess (API.Guess (theId given) (T.pack p)) >>= \case
-                    API.GuessResponse API.GuessWin _ _ -> putStrLn "Won!" >> kill'em_all >> exitSuccess
+                    API.GuessResponse API.GuessWin _ _ -> do
+                        putStrLn "Won!"
+                        kill'em_all
+                        simpleHttp "http://botis.org:9999/play/crash.wav"
+                        exitSuccess
                     API.GuessResponse API.GuessError _ (Just msg) -> putStrLn (T.unpack msg) >> kill'em_all >> exitSuccess
                     API.GuessResponse API.GuessMismatch (Just vs) _ -> do
                         addExample [(read $ T.unpack $ vs ^?! ix 0, 1000, read $ T.unpack $ vs ^?! ix 1)]
             atomically $ modifyTVar (guessCandidate given) $ at p .~ Nothing
+
 addExample :: Given Environment => [(BitVector, Double, BitVector)] -> IO ()
 addExample xs = do
     forM_ xs $ \(i, w, o) -> atomically $ modifyTVar (examples given) $ at i ?~ (w, o)
     removeTrivial
-    forkIO $ judgement
+    judgement
     return ()
     
 oracleSummoner :: (Given API.Token, Given Environment) => IO ()
@@ -169,7 +174,7 @@ trainProblem level = do
     return (ident, size, map T.unpack ops)
 
 main = getArgs >>= \case
-    (level : _) -> give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ do
+    (level : w1 : w2 : w3 : _) -> give (API.Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ do
         (ident, size, ops) <- trainProblem (read level)
         ves <- newTVarIO Map.empty
         vgs <- newTVarIO Map.empty
@@ -190,8 +195,9 @@ main = getArgs >>= \case
                 }
         print (size, ops)
         (give env :: (Given Environment => IO ()) => IO ()) $ do
-            replicateM_ 4 $ spawn 7
-            replicateM_ 4 $ spawn 19
+            replicateM_ 3 $ spawn (read w1)
+            replicateM_ 3 $ spawn (read w2)
+            replicateM_ 3 $ spawn (read w3)
             forkKillme trainer
             oracleSummoner
 
@@ -208,9 +214,10 @@ kill'em_all = do
 
 spawn :: Given Environment => Double -> IO ThreadId
 spawn t = forkKillme $ forever $ do
-    timeout (floor $ t * 2 * 1000 * 1000) (genLambda t) >>= \case
-        Nothing -> z3Slayer
-        Just _ -> return ()
+    forkKillme $ timeout (floor $ t * 2 * 1000 * 1000) (genLambda t) >>= \case
+        Nothing -> z3Slayer >> putStrLn "Spawning: Failed."
+        Just _ -> putStrLn "Spawning: Done."
+    threadDelay $ 10 * 1000 * 1000
 
 z3Slayer = do
     procs <- map words <$> lines <$> readProcess "/bin/ps" [] ""
