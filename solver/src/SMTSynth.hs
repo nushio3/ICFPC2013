@@ -314,14 +314,13 @@ genProgram myFlags oprs size = do
 
 findProgram :: Int -> SpecialFlags -> [Opr] -> Int -> [(Word64, Word64)] -> IO Program
 findProgram seed myFlags oprs size samples = do
-  putStrLn $ "inputs: " ++ show samples
   let c = do
         (opcs, argss) <- genProgram myFlags oprs size
         forM_ samples $ \(i, o) ->
           behave myFlags oprs size opcs argss (literal i) (literal o)
         return (true :: SBool)
   -- generateSMTBenchmarks True "find" c
-  res <- satWith (z3 {solver=(solver z3) {options=["smt.random_seed="++show seed]}}) c
+  res <- satWith (z3 {solver=(solver z3) {options=options (solver z3) ++ ["smt.random_seed="++show seed]}}) c
   -- print res
   return $ parseProgram (myFlags^.tfoldMode) $ show res
 
@@ -408,6 +407,7 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
 
   let go es add = do
         -- putStrLn "behave..."
+        putStrLn $ "inputs: " ++ show (add ++ es)
         progn <- para cpuNum $ \i -> findProgram i myFlags oprs size $ add ++ es
         system "pkill z3"
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram myFlags oprs progn)
