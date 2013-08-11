@@ -27,6 +27,9 @@ library
     SMTSynth
     Gulwani4
     GulwaniHead
+    SolverUtil
+    StupidSat
+    WrapSMTSynth
 
 
   hs-source-dirs:    src/  
@@ -219,3 +222,19 @@ executable smt-synth
     , split
     , mtl
   buildable: True
+
+executable parallel-solver
+  Hs-Source-Dirs: exe-src
+  Ghc-Options: -Wall -O2
+  Main-Is: parallel-solver.hs
+  Build-Depends:
+    base ==4.*
+    , solver
+    , random
+    , lens
+    , stm
+    , containers
+    , text
+    , process
+    , reflection
+    , time
