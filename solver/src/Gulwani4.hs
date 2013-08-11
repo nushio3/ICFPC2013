@@ -141,8 +141,8 @@ testMain =  do
       [( 0 , (1.341, 1))
       ,( 3 , (1.341, 6)) ]
 
-satLambda :: Int -> [String] -> Map.Map BitVector (Double, BitVector) -> IO (Maybe String)
-satLambda probSize opStrs  exampleMap = do
+satLambda :: Int -> [String] ->  Double -> Map.Map BitVector (Double, BitVector) -> IO (Maybe String)
+satLambda  probSize opStrs weight exampleMap = do
   let 
     examples :: [(SBitVector, SBitVector)]
     examples = map (both %~ fromIntegral) $ 

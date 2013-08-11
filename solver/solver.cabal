@@ -21,6 +21,8 @@ library
     RichBV
     SRichBV
     SBVTools
+
+    SolverUtil
     Convert
     API
     Database
