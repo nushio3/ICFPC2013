@@ -226,11 +226,11 @@ genProgram myFlags oprs size = do
   opcs <- sWord8s [ printf "opc-%d" i | i <- take size [offs ..] ]
   constrain $ bAll (`inRange` (0, fromIntegral $ length oprs-1)) opcs
 
-  let costs = map (literal . fromIntegral . argNum) oprs
+  --let costs = map (literal . fromIntegral . argNum) oprs
 
-  b <- liftIO $ randomIO
-  when b $
-    constrain $ sum [ select costs (1 :: SInt8) opc | opc <- opcs ] - (literal $ fromIntegral $ length oprs) .<= (literal $ fromIntegral size)
+  --b <- liftIO $ randomIO
+  --when b $
+  --  constrain $ sum [ select costs (1 :: SInt8) opc | opc <- opcs ] - (literal $ fromIntegral $ length oprs) .<= (literal $ fromIntegral size)
 
   argss <- forM (take size [offs ..]) $ \ln -> do
     args <- sWord8s [ printf "arg-%d-%d" ln i | i <- [0::Int ..2] ]
