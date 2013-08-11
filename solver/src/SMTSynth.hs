@@ -444,13 +444,9 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
         case o of
           Nothing -> do
             putStrLn "Accepted: yatapo-(^_^)!"
-<<<<<<< HEAD
             if (myFlags ^. bonusMode)
                then system "wget http://botis.org:9999/play/AC.wav -O /dev/null"
                else system "wget http://botis.org:9999/play/meow.wav -O /dev/null"
-=======
-            system "wget http://botis.org:9999/play/meow.wav -O /dev/null"
->>>>>>> ee85a80e29007dc423e054808153f0ec20f9af5e
             return ()
           Just oo -> do
             putStrLn $ "distinct: " ++ show oo
