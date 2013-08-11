@@ -14,6 +14,7 @@ import Debug.Trace
 import Control.Applicative
 import Data.List
 import Data.List.Split
+import Control.Concurrent.Async
 
 import API
 import qualified RichBV as BV
@@ -371,19 +372,27 @@ toProgram myFlags oprs (opcs, argss) =
     If0     -> BV.If (ls !! i) (ls !! j) (ls !! k)
   toExp _ _ _ = error "tsurapoyo"
 
-synth :: Given Token => Int -> [T.Text] -> T.Text -> IO ()
-synth ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use fold (>_<)" else do
+para :: Int -> (Int -> IO a) -> IO a
+para n m = foldl1 rac $ map m [0..n-1] where
+  rac a b = do
+    x <- race a b
+    case x of
+      Left v -> return v
+      Right v -> return v
+
+synth :: Given Token => Int -> Int -> [T.Text] -> T.Text -> IO ()
+synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use fold (>_<)" else do
   let (ops, adj, isTFold)
         | "fold" `elem` ops' || "tfold" `elem` ops' =
           (ops' \\ ["tfold"], -6, True)
         | otherwise =
           (ops', -2, False)
 
-  i0 <- randomIO
-  i1 <- randomIO
-
-  let is = (i1 .|. 1) : (i0 .&. (complement 1)) : []
+  i0 <- map (\x -> x `div` 2 * 2) <$> replicateM 128 randomIO
+  i1 <- map (\x -> x `div` 2 * 2 + 1) <$> replicateM 128 randomIO
+  let is = concatMap (\(a, b) -> [a, b]) $ zip i0 i1
   os <- oracleIO ident is
+  let es = chunksOf 2 $ zip is os
 
   let 
     myFlags = defaultSpecialFlags
@@ -391,14 +400,14 @@ synth ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use fold (>
       & tfoldMode .~ ("tfold" `elem` ops')
   
   let oprs = catMaybes $ map toOp ops
-  let size = max 1 $ (ss + adj - sum (map pred $ map argNum oprs) + 1)
+  let size = max 1 $ (ss + adj + 1 - sum (map pred $ map argNum oprs))
 
   putStrLn $ "Start synthesis: " ++ T.unpack ident ++ " " ++ show ss ++ " (" ++ show size ++ "), " ++ show ops
   when isTFold $ putStrLn "TFold Mode (>_<);;"
 
-  let go e = do
+  let go es add = do
         -- putStrLn "behave..."
-        progn <- findProgram myFlags oprs size e
+        progn <- para cpuNum $ \i -> findProgram myFlags oprs size $ add ++ (es !! i)
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram myFlags oprs progn)
         o <- oracleDistinct ident $ toProgram myFlags oprs progn
         case o of
@@ -406,7 +415,7 @@ synth ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use fold (>
             putStrLn "Accepted: yatapo-(^_^)!"
           Just oo -> do
             putStrLn $ "distinct: " ++ show oo
-            go (oo:e)
+            go es (oo:add)
 
         ---- a <- distinct oprs size e progn
         --case a of
@@ -415,4 +424,4 @@ synth ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use fold (>
         --    [g] <- oracleIO ident [f]
         --    go ((f, g):e)
 
-  go $ zip is os
+  go (es :: [[(Word64, Word64)]]) []

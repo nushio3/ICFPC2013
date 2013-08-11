@@ -55,8 +55,9 @@ library
     , HTTP
     , mtl
     , vector
+    , async
 
-  Ghc-Options: -Wall -O2
+  Ghc-Options: -Wall -O2 -threaded
 
 Test-Suite spec
   Type: exitcode-stdio-1.0
@@ -208,7 +209,7 @@ executable survey-expr
 
 executable smt-synth
   Hs-Source-Dirs: exe-src
-  Ghc-Options: -Wall -O2
+  Ghc-Options: -Wall -O2 -threaded
   Main-Is: smt-synth.hs
   Other-Modules: 
                     
@@ -221,6 +222,7 @@ executable smt-synth
     , solver
     , split
     , mtl
+    , async
   buildable: True
 
 executable parallel-solver

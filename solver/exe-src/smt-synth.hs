@@ -19,23 +19,23 @@ import SMTSynth
 
 main :: IO ()
 main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >>= \case
-  ("training": level: fld) -> do
+  ("training": cpu: level: fld) -> do
     TrainingProblem prog ident size ops <- train $ TrainRequest (read level) $ map T.pack fld
     putStrLn $ "Problem description: " ++ T.unpack ident ++ " " ++ show size ++ " " ++ unwords (map T.unpack ops)
     putStrLn $ "Expected answer: " ++ T.unpack prog
     putStrLn ""
-    synth size ops ident
-  ["specify", tid] -> do
+    synth (read cpu) size ops ident
+  ["specify", cpu, tid] -> do
     problems <- myproblems
     case find (\p -> problemId p == T.pack tid) problems of
-      Just p  -> synth (problemSize p) (problemOperators p) (problemId p)
+      Just p  -> synth (read cpu) (problemSize p) (problemOperators p) (problemId p)
       Nothing -> fail "No such problem"
-  ["auto"] -> do
+  ["auto", cpu] -> do
     putStrLn "You start automatic solving mode, really?"
     "y" <- getLine
     problems <- myproblems
     forM_ (sortBy (compare `on` problemSize) problems) $ \p -> do
       when (isSolved p /= Just True && timeLeft p /= Just 0) $ do
-        synth (problemSize p) (problemOperators p) (problemId p)
+        synth (read cpu) (problemSize p) (problemOperators p) (problemId p)
   _ -> do
     fail "invalid input ('_`)"
