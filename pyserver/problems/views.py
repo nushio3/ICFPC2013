@@ -26,12 +26,18 @@ def isDead(p):
 def isUntouched(p):
     return not isSolved(p) and getTimeLeft(p) == 300
 
+
+def UniqifyTraining(ts):
+    result = {}
+    for p in ts:
+        result[p['challenge']] = p
+    return result.values()
+
+
 def DoesIncludeAndExclude(baseline, include_list, exclude_list):
     if not baseline.issuperset(include_list):
-        print 'notinc', baseline, include_list
         return False
     if baseline.intersection(exclude_list):
-        print 'notexc', baseline, include_list
         return False
     return True
 
@@ -65,6 +71,7 @@ def index(request):
     autoload_status = problems.models.GetAutoLoadStatus()
 
     training_problems = problems.models.LoadTraining()
+    training_problems = UniqifyTraining(training_problems)
     training_problems = filter(
         lambda p: DoesIncludeAndExclude(set(p['operators']),
                                         include_filter, exclude_filter),

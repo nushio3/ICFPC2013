@@ -14,6 +14,7 @@ def Parse():
     parser = ArgumentParser(description='Collect training programs.')
     parser.add_argument('--size', type=int, default=42)
     parser.add_argument('--previous_input')
+    parser.add_argument('--sleep', type=int, default=5)
     parser.add_argument('-n', type=int, default=1)
     return parser.parse_args()
 
@@ -39,8 +40,11 @@ def main(argv):
         result = json.load(fin)
         fin.close()
     for i in xrange(flags.n):
-        result.append(GetTraining(flags.size))
-        time.sleep(10)
+        try:
+            result.append(GetTraining(flags.size))
+        except urllib2.HTTPError, e:
+            sys.stderr.write('error: ' + str(e) + '\n')
+        time.sleep(flags.sleep)
     sys.stdout.write(json.dumps(result))
 
 
