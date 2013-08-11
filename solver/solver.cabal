@@ -24,8 +24,9 @@ library
     Convert
     API
     Database
-
-    Gulwani2
+    SMTSynth
+    Gulwani4
+    GulwaniHead
 
 
   hs-source-dirs:    src/  
@@ -37,8 +38,10 @@ library
     , containers == 0.5.*
     , lens ==3.9.*
     , lens-aeson
+    , logict
     , random
     , safe
+    , split
     , sbv == 2.10.*
     , trifecta ==1.1.*
     , text
@@ -46,7 +49,10 @@ library
     , http-types
     , reflection
     , http-conduit
+    , HTTP
     , mtl
+    , vector
+    , MissingH
   Ghc-Options: -Wall -O2
 
 Test-Suite spec
@@ -210,5 +216,6 @@ executable smt-synth
     , text
     , random
     , solver
-
+    , split
+    , mtl
   buildable: True
