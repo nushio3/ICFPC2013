@@ -7,6 +7,7 @@ import Control.Lens hiding ((.>))
 import Control.Lens.TH
 import Control.Monad
 import Data.Bits
+import Debug.Trace (trace)
 import Data.Char
 import qualified Data.String.Utils as Str
 import Data.List (isInfixOf, isPrefixOf)
@@ -114,8 +115,8 @@ progOfSize size0 opList0 = do
 testMain = do
   satLambda undefined $
     Map.fromList 
-      [( 0 , (1.341, 1))
-      ,( 3 , (1.341, 6)) ]
+      [( 0 , (1.341, 1))]
+--      ,( 3 , (1.341, 6)) ]
 
 satLambda :: API.Problem -> Map.Map BitVector (Float, BitVector) -> IO (Maybe String)
 satLambda probSpec exampleMap = do
@@ -130,8 +131,7 @@ satLambda probSpec exampleMap = do
     thmBehs <- (flip. flip zipWithM) [0..] examples $ \i (a,b) -> 
       phiFunc prog i a b
     return $ thmWfp &&& bAnd thmBehs
-  
-  case ("Satisfiable." `isPrefixOf` show ret) of
+  case ("Satisfiable." `isInfixOf` show ret) of
     False -> return Nothing
     True -> parseSBVOutput $ show ret
     
@@ -150,16 +150,16 @@ parseSBVOutput outputStr = do
       lines outputStr
     findAddrLine :: String -> [(VarEdge, Int)]
     findAddrLine str = case words str of
-      (key:_:val:_) | (take 3 key == "oa_")
+      (key:_:val:_) | (take 3 key == "oa-")
                       -> [(OutEdge (getRaw key), read val) ]
-      (key:_:val:_) | (take 3 key == "ia_")
+      (key:_:val:_) | (take 3 key == "ia-")
                       -> [(InEdge (getRaw key) (getArgIdx key), read val) ]
                          
                          
       _               -> []
       
     getRaw key = Str.split "-" key !! 1
-    getArgIdx key = read $ Str.split "-" key !! 3
+    getArgIdx key = read $ Str.split "-" key !! 2
     
 phiFunc :: LVProgram -> Int -> Val -> Val -> Symbolic SBool
 phiFunc lvProg exampleIdx alpha beta = do
