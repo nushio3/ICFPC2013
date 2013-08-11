@@ -238,8 +238,6 @@ genProgram oprs0 size = do
   -- (plus 0 _) (plus _ 0) (plus i j) i >= j
   opid Plus $ \i j _ -> i ./= 0 &&& j ./= 0 &&& i .<= j
 
-  when bonusMode $ error "Bonus kitapo \\(>_<)/"  
-  
   when bonusMode $ do
     let lastOpcI  = length opcs - 1
         lastOpcI2 = length opcs - 2
@@ -282,13 +280,14 @@ distinct oprs size samples (oopcs, oargss) = do
   return $ fmap read $ lookup "distinctInput" $ parseRes $ show res
 
 findProgram :: [Opr] -> Int -> [(Word64, Word64)] -> IO Program
-findProgram oprs size samples = do
+findProgram oprs0 size samples = do
   putStrLn $ "inputs: " ++ show samples
   let c = do
-        (opcs, argss) <- genProgram oprs size
+        (opcs, argss) <- genProgram oprs0 size
         forM_ samples $ \(i, o) ->
           behave oprs size opcs argss (literal i) (literal o)
         return (true :: SBool)
+      oprs = filter (/=Bonus) oprs0
   -- generateSMTBenchmarks True "find" c
   res <- sat c
   return $ parseProgram $ show res
@@ -340,14 +339,15 @@ synth ss ops ident = if "fold" `elem` ops || "tfold" `elem` ops then putStrLn "I
   let is = [0, 1]
   os <- oracleIO ident is
 
-  let oprs = catMaybes $ map toOp ops
+  let oprs0 = catMaybes $ map toOp ops
+      oprs = filter (/=Bonus) oprs0
   let size = max 1 $ ss - 2 -- - sum (map pred $ map argNum oprs)
 
   putStrLn $ "Start synthesis: " ++ T.unpack ident ++ " " ++ show ss ++ " (" ++ show size ++ "), " ++ show ops
 
   let go e = do
         -- putStrLn "behave..."
-        progn <- findProgram oprs size e
+        progn <- findProgram oprs0 size e
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram oprs progn)
         o <- oracleDistinct ident $ toProgram oprs progn
         case o of
