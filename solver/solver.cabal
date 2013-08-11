@@ -252,6 +252,7 @@ executable solver-api-server
     base==4.*
     , aeson
     , bytestring
+    , cmdargs
     , solver
     , scotty
     , resourcet
