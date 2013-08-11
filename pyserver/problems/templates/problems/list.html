@@ -101,7 +101,7 @@
 </table>
 
 <h2 id="training">{{ training_problems|length }} Training problems</h2>
-<table><tr><th>id</th><th>size</th><th>operators</th></tr>
+<table><tr><th>id</th><th>size</th><th>operators</th><th>challenge</th></tr>
 {% for p in training_problems %}
 <tr>
   <td>{{ p.id }}</td>
@@ -110,6 +110,7 @@
       {{ op }},
       {% endfor %}
   </td>
+  <td>{{ p.challenge }}</td>
 </tr>
 {% endfor %}
 </table>
