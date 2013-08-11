@@ -25,6 +25,7 @@ import qualified API
 import qualified Data.Map as Map
 import Network.HTTP.Conduit
 import qualified WrapSMTSynth
+import SMTSynth hiding (Program)
 
 data Environment = Environment
     { examples :: TVar (Map.Map BitVector (Double, BitVector))
@@ -183,6 +184,8 @@ main = getArgs >>= \case
         oc <- newTVarIO 0
         t <- getCurrentTime
         st <- newTVarIO 1.0
+        let flags = defaultSpecialFlags & bonusMode .~ ("bonus" `elem` ops)
+                & tfoldMode .~ ("tfold" `elem` ops)
         let env = Environment { examples = ves
                 , guessCandidate = vgs
                 , evalCandidate = vev
@@ -190,7 +193,7 @@ main = getArgs >>= \case
                 , startTime = t
                 , theId = ident
                 , strictness = st
-                , theSatLambdas = [WrapSMTSynth.satLambda size ops]
+                , theSatLambdas = [WrapSMTSynth.satLambda flags size ops]
                 , _DEATH_NOTE = deathNote
                 }
         print (size, ops)
