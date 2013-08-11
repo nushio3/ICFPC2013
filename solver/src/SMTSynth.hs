@@ -215,7 +215,7 @@ genProgram oprs size = do
   -- redundant
 
   -- (if0 0 _) and (if0 1 _) is redundant
-  opid If0 $ \i j k -> i ./= 0 &&& i ./= 1 &&& i .< j
+  opid If0 $ \i j k -> i ./= 0 &&& i ./= 1 &&& j .< k
 
   -- (and 0 _) and (and _ 0)
   opid And $ \i j _ -> i ./= 0 &&& j ./= 0 &&& i .< j
@@ -233,7 +233,7 @@ genProgram oprs size = do
   opid (Shr 16) $ \i _ _ -> i ./= 0 &&& i ./= 1
 
   -- (plus 0 _) (plus _ 0) (plus i j) i >= j
-  opid Plus $ \i j _ -> i ./= 0 &&& j ./= 0 &&& i .< j
+  opid Plus $ \i j _ -> i ./= 0 &&& j ./= 0 &&& i .<= j
 
   return (opcs, argss)
 

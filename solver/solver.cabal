@@ -238,3 +238,4 @@ executable parallel-solver
     , process
     , reflection
     , time
+  buildable: False
