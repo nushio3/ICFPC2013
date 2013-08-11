@@ -14,5 +14,5 @@ satLambda :: SpecialFlags -> Int -> [String] -> Double -> Map.Map BitVector (Dou
 satLambda flags size ops t example = do
     let ops' = catMaybes $ map (SMTSynth.toOp . T.pack) ops
     exs <- sampleExample (floor $ max 2 $ t / fromIntegral (sqrt $ length ops * size)) example
-    r <- try $ findProgram flags ops' size exs :: IO (Either IOException SMTSynth.Program)
+    r <- try $ findProgram 0 flags ops' size exs :: IO (Either IOException SMTSynth.Program)
     return $ either (const Nothing) (Just . printProgram . toProgram flags ops') r

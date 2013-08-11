@@ -13,6 +13,12 @@ import Network.Wai.Middleware.RequestLogger -- install wai-extra if you don't ha
 import Gulwani4
 import SolverAPI
 
+{-
+- Things to be implemented:
+--- Change port.
+--- Record and report load.
+-}
+
 main = scotty 10203 $ do
   middleware logStdoutDev
 
@@ -26,7 +32,7 @@ main = scotty 10203 $ do
         status status400
         json $ object ["message" .= ("Bad json request"::String)]
       Just q -> do
-        r <- liftIO $ SolverAPI.satLambda4 q
+        r <- liftIO $ SolverAPI.satLambda q
         case r of
           Nothing -> do
             status status400
