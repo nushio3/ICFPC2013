@@ -57,6 +57,7 @@ library
     , mtl
     , vector
     , async
+    , process
 
   Ghc-Options: -Wall -O2 -threaded
 

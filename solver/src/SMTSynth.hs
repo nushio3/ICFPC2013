@@ -15,6 +15,7 @@ import Control.Applicative
 import Data.List
 import Data.List.Split
 import Control.Concurrent.Async
+import System.Cmd
 
 import API
 import qualified RichBV as BV
@@ -408,6 +409,7 @@ synth cpuNum ss ops' ident = if "fold" `elem` ops' then putStrLn "I can not use 
   let go es add = do
         -- putStrLn "behave..."
         progn <- para cpuNum $ \i -> findProgram myFlags oprs size $ add ++ (es !! i)
+        system "pkill z3"
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram myFlags oprs progn)
         o <- oracleDistinct ident $ toProgram myFlags oprs progn
         case o of
