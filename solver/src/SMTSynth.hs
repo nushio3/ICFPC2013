@@ -8,6 +8,7 @@ import Data.Reflection
 import qualified Data.Text as T
 import Text.Printf
 import Data.Maybe
+import Debug.Trace
 import Control.Applicative
 import Data.List
 import Data.List.Split
@@ -234,7 +235,7 @@ genProgram bonusMode oprs size = do
   opid (Shr 4)  $ \i j k -> i ./= 0 &&& i ./= 1
   opid (Shr 16) $ \i j k -> i ./= 0 &&& i ./= 1
 
-  when bonusMode $ do
+  when bonusMode $  trace (printf "Bonus\\(^o^)/ size:%d\n" size) $do
     let lastOpcI  = length opcs - 1
         lastOpcI2 = length opcs - 2
         
