@@ -321,7 +321,7 @@ findProgram seed myFlags oprs size samples = do
           behave myFlags oprs size opcs argss (literal i) (literal o)
         return (true :: SBool)
   -- generateSMTBenchmarks True "find" c
-  res <- satWith (z3 {solver=(solver z3) {options=["smt.random_seed="++show seed]}}) c
+  res <- satWith (z3 {solver=(solver z3) {options=options (solver z3) ++ ["smt.random_seed="++show seed]}}) c
   -- print res
   return $ parseProgram (myFlags^.tfoldMode) $ show res
 
