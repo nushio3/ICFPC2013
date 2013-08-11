@@ -36,6 +36,7 @@ library
     , aeson
     , bytestring
     , containers == 0.5.*
+    , HTTP
     , lens ==3.9.*
     , lens-aeson
     , logict

@@ -9,11 +9,13 @@ import Control.Monad
 import Data.Bits
 import Debug.Trace (trace)
 import Data.Char
+import Data.Tuple (swap)
 import qualified Data.String.Utils as Str
-import Data.List (isInfixOf, isPrefixOf)
+import Data.List (isInfixOf, isPrefixOf, sort)
 import qualified Data.Map as Map
 import Data.SBV
 import qualified Data.Vector as V
+import Network.HTTP.Base (urlEncode, urlDecode)
 import Text.Printf
 
 import BV(BitVector)
@@ -29,10 +31,13 @@ data Op = Const Int | Var
                            deriving (Eq, Ord, Show, Read)
 
 data VarEdge 
- = OutEdge String
- | InEdge String Int
+ = OutEdge { edgeKey :: String}
+ | InEdge { edgeKey :: String, edgeIdx :: Int}
     deriving (Eq, Ord, Show, Read)
                                     
+isOutEdge :: VarEdge -> Bool
+isOutEdge (OutEdge _) = True
+isOutEdge _           = False
                                     
 arity :: Op -> Int
 arity (Const _) = 0
@@ -46,8 +51,9 @@ arity Xor = 2
 arity Plus = 2
 arity If0 = 3
 
-oprToKey :: Op -> String
-oprToKey = filter isAlphaNum . show
+oprToKey :: Simple Iso Op String
+oprToKey = iso (urlEncode . show) (read . urlDecode )
+
 
 data Opvar a = Opvar 
   { _strkey ::String, -- unique key for printing and searching
@@ -84,7 +90,7 @@ progOfSize size0 opList0 = do
 --  ret <- symbolic "returnAddr"
   addrLib <- fmap concat $ forM opList $
     \opr -> forM [0..multiplicity-1] $ 
-      \i -> symbolicOp (oprToKey opr++"#"++show i) opr 
+      \i -> symbolicOp (view oprToKey opr++"#"++show i) opr 
 
   let 
     allAddrs :: [Addr]
@@ -113,13 +119,13 @@ progOfSize size0 opList0 = do
   return (thmWfp, LVProgram {-  ret -}  addrLib)
 
 testMain = do
-  satLambda undefined $
+  satLambda undefined undefined $
     Map.fromList 
-      [( 0 , (1.341, 1))]
---      ,( 3 , (1.341, 6)) ]
+      [( 0 , (1.341, 1))
+      ,( 3 , (1.341, 6)) ]
 
-satLambda :: API.Problem -> Map.Map BitVector (Float, BitVector) -> IO (Maybe String)
-satLambda probSpec exampleMap = do
+satLambda :: Int -> [String] -> Map.Map BitVector (Float, BitVector) -> IO (Maybe String)
+satLambda _ _  exampleMap = do
   let 
     examples :: [(SBitVector, SBitVector)]
     examples = map (both %~ fromIntegral) $ 
@@ -138,9 +144,30 @@ satLambda probSpec exampleMap = do
 parseSBVOutput :: String -> IO (Maybe String)
 parseSBVOutput outputStr = do
   mapM_ print $ Map.toList satMap
+  print $ expand rootEdge
   return ret
   where
+    expand :: VarEdge -> String
+    expand (OutEdge key) = 
+      printf "(%s)" $ unwords $ (key : ) $
+      map (expand . (oEdgeDict V.!) . (satMap Map.!) ) inEdges
+      where opr = view (from oprToKey) (takeWhile (/='#') key)
+            inEdges = [InEdge key i| i<- [0..arity opr-1]]
+    
+    oEdgeDict :: V.Vector VarEdge
+    oEdgeDict = 
+      V.fromList $
+      map snd $ sort $
+      map swap $
+      filter (isOutEdge . fst) $
+      Map.toList satMap
+    
+    
     ret = Nothing
+    
+    rootEdge :: VarEdge
+    rootEdge = V.last oEdgeDict
+    
     satMap :: Map.Map VarEdge Int
     satMap = 
       Map.fromList $
