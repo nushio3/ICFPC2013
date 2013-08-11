@@ -19,8 +19,8 @@ import SMTSynth
 
 main :: IO ()
 main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >>= \case
-  ("training": level: _) -> do
-    TrainingProblem prog ident size ops <- train $ TrainRequest (read level) []
+  ("training": level: fld) -> do
+    TrainingProblem prog ident size ops <- train $ TrainRequest (read level) $ map T.pack fld
     putStrLn $ "Problem description: " ++ T.unpack ident ++ " " ++ show size ++ " " ++ unwords (map T.unpack ops)
     putStrLn $ "Expected answer: " ++ T.unpack prog
     putStrLn ""
