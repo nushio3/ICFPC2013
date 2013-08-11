@@ -32,7 +32,7 @@ main = scotty 10203 $ do
         status status400
         json $ object ["message" .= ("Bad json request"::String)]
       Just q -> do
-        r <- liftIO $ SolverAPI.satLambda4 q
+        r <- liftIO $ SolverAPI.satLambda q
         case r of
           Nothing -> do
             status status400
