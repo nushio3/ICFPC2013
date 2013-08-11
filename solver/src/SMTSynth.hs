@@ -1,8 +1,10 @@
-{-# LANGUAGE LambdaCase, FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE LambdaCase, FlexibleContexts, OverloadedStrings, TemplateHaskell #-}
 module SMTSynth where
 
 import Data.SBV
 import System.Random
+import Control.Lens ((&), (^.), (.~))
+import Control.Lens.TH
 import Control.Monad
 import Data.Reflection
 import qualified Data.Text as T
@@ -15,6 +17,16 @@ import Data.List.Split
 
 import API
 import qualified RichBV as BV
+
+data SpecialFlags = SpecialFlags
+  { _bonusMode :: Bool
+  , _tfoldMode :: Bool }
+  deriving (Eq, Ord, Read, Show)  
+
+$(makeLenses ''SpecialFlags)
+
+defaultSpecialFlags :: SpecialFlags
+defaultSpecialFlags = SpecialFlags False False 
 
 -- TODO: support fold
 -- if0, not, shl1, shr1, shr4, shr16, and, or, xor, plus
@@ -196,8 +208,8 @@ behave oprs size opcs argss i o = do
   forM_ (zip3 [3..] candss opcs) $ \(ln, cands, opc) ->
     constrain $ vars !! ln .== select cands 0 opc
 
-genProgram :: Bool -> [Opr] -> Int -> Symbolic SProgram
-genProgram bonusMode oprs size = do
+genProgram :: SpecialFlags -> [Opr] -> Int -> Symbolic SProgram
+genProgram myFlags oprs size = do
   opcs <- sWord8s [ printf "opc-%d" i | i <- take size [3::Int ..] ]
   constrain $ bAll (`inRange` (0, fromIntegral $ length oprs-1)) opcs
 
@@ -235,7 +247,7 @@ genProgram bonusMode oprs size = do
   opid (Shr 4)  $ \i j k -> i ./= 0 &&& i ./= 1
   opid (Shr 16) $ \i j k -> i ./= 0 &&& i ./= 1
 
-  when bonusMode $  trace (printf "Bonus\\(^o^)/ size:%d\n" size) $do
+  when (myFlags ^. bonusMode) $ trace (printf "Bonus\\(^o^)/ size:%d\n" size) $ do
     let lastOpcI  = length opcs - 1
         lastOpcI2 = length opcs - 2
         
@@ -260,7 +272,7 @@ genProgram bonusMode oprs size = do
 distinct :: [Opr] -> Int -> [(Word64, Word64)] -> Program -> IO (Maybe Word64)
 distinct oprs size samples (oopcs, oargss) = do
   let c = do
-        (opcs, argss) <- genProgram False oprs size
+        (opcs, argss) <- genProgram defaultSpecialFlags oprs size
 
         forM_ samples $ \(i, o) ->
           behave oprs size opcs argss (literal i) (literal o)
@@ -278,11 +290,11 @@ distinct oprs size samples (oopcs, oargss) = do
   generateSMTBenchmarks True "distinct" c
   return $ fmap read $ lookup "distinctInput" $ parseRes $ show res
 
-findProgram :: Bool -> [Opr] -> Int -> [(Word64, Word64)] -> IO Program
-findProgram bonusMode oprs size samples = do
+findProgram :: SpecialFlags -> [Opr] -> Int -> [(Word64, Word64)] -> IO Program
+findProgram myFlags oprs size samples = do
   putStrLn $ "inputs: " ++ show samples
   let c = do
-        (opcs, argss) <- genProgram bonusMode oprs size
+        (opcs, argss) <- genProgram myFlags oprs size
         forM_ samples $ \(i, o) ->
           behave oprs size opcs argss (literal i) (literal o)
         return (true :: SBool)
@@ -339,7 +351,9 @@ synth ss ops ident = if "fold" `elem` ops || "tfold" `elem` ops then putStrLn "I
   let is = (i1 .|. 1) : (i0 .&. (complement 1)) : []
   os <- oracleIO ident is
 
-  let bonusMode = "bonus" `elem` ops
+  let 
+    myFlags = defaultSpecialFlags
+      & bonusMode .~ ("bonus" `elem` ops)
 
   
   let oprs = catMaybes $ map toOp ops
@@ -349,7 +363,7 @@ synth ss ops ident = if "fold" `elem` ops || "tfold" `elem` ops then putStrLn "I
 
   let go e = do
         -- putStrLn "behave..."
-        progn <- findProgram bonusMode oprs size e
+        progn <- findProgram myFlags oprs size e
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram oprs progn)
         o <- oracleDistinct ident $ toProgram oprs progn
         case o of
