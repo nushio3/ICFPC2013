@@ -42,6 +42,7 @@
 <span><a href="#untouched">{{ untouched_problems|length }} Untouched</a></span>
 <span><a href="#solved">{{ solved_problems|length }} Solved</a></span>
 <span><a href="#dead">{{ dead_problems|length }} Dead</a></span>
+<span><a href="#training">{{ training_problems|length }} Training</a></span>
 </div>
 <h2 id="solving">{{ under_solve_problems|length }} Problems getting solved now</h2>
 <table><tr><th>id</th><th>size</th><th>operators</th></tr>
@@ -95,6 +96,21 @@
       {{ op }},
       {% endfor %}
   </td>
+</tr>
+{% endfor %}
+</table>
+
+<h2 id="training">{{ training_problems|length }} Training problems</h2>
+<table><tr><th>id</th><th>size</th><th>operators</th><th>challenge</th></tr>
+{% for p in training_problems %}
+<tr>
+  <td>{{ p.id }}</td>
+  <td>{{ p.size }}</td>
+  <td>{% for op in p.operators %}
+      {{ op }},
+      {% endfor %}
+  </td>
+  <td>{{ p.challenge }}</td>
 </tr>
 {% endfor %}
 </table>
