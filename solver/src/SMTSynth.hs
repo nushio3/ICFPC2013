@@ -149,10 +149,10 @@ genProgram myFlags oprs size = do
     constrain $ bAll (.< (literal $ fromIntegral ln)) args
     return args
 
-  b <- liftIO randomIO
-  when b $ do
-    let costs = map (fromIntegral . argNum) oprs
-    constrain $ sum [ select costs 1 opc | opc <- opcs ] - (fromIntegral $ length oprs) .<= (fromIntegral size :: SInt8)
+--  b <- liftIO randomIO
+--  when b $ do
+--    let costs = map (fromIntegral . argNum) oprs
+--    constrain $ sum [ select costs 1 opc | opc <- opcs ] - (fromIntegral $ length oprs) .<= (fromIntegral size :: SInt8)
 
   border <- sWord8 "border"
 
@@ -374,7 +374,7 @@ synth cpuNum ss ops' ident = do
   let go es = do
         -- putStrLn "behave..."
         putStrLn $ "inputs: " ++ show es
-        progn <- para cpuNum $ \i -> findProgram (myFlags&randomSeed.~((abs $ (seeds::[Int]) !! i)`mod`65536)) oprs (size + i `mod` 3) $ take 5 es
+        progn <- para cpuNum $ \i -> findProgram (myFlags&randomSeed.~((abs $ (seeds::[Int]) !! i)`mod`65536)) oprs (cycle [size `div` 2, size * 2 `div` 3, size - 2, size, size + 2, size + 5, size * 4 `div` 3] !! i) $ take 5 es
         system "pkill z3"
         -- print progn
         putStrLn $ "found: " ++ (BV.printProgram $ toProgram myFlags oprs progn)

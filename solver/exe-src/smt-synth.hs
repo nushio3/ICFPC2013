@@ -33,9 +33,17 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
       Just p  -> synth (read cpu) (problemSize p) (problemOperators p) (problemId p)
       Nothing -> fail "No such problem"
   ("auto": cpu:flds) -> do
-    putStrLn "You start automatic solving mode, really?"
-    "y" <- getLine
-    allProblems <- myproblems
+    -- system "cd ..; ./mapssh S '(4,9)' 'killall smt-synth' | sh"
+    allProblems0 <- myproblems
+
+
+    allProblems <-fmap (map snd .sortBy (compare `on` fst))$
+       forM allProblems0 (\x ->do
+          y <- randomRIO (0,1::Double)
+          return (y,x)
+          )
+             
+    
 
     let problems = 
           (if ("bonus"`elem`flds) then filter isBonusProb else id) $
@@ -65,7 +73,7 @@ main = give (Token "0017eB6c6r7IJcmlTb3v4kJdHXt1re22QaYgz0KjvpsH1H") $ getArgs >
               Nothing -> putStrLn "timeout poyo ('_`) tsurai..."
               Just _ -> do
                 putStrLn "toketa"
-                system "../mapssh S '(4,9)' 'killall smt-synth' | sh"
+                --system "cd ..; ./mapssh S '(4,9)' 'killall smt-synth' | sh"
                 return ()
 
   _ -> do
