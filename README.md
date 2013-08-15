@@ -1,6 +1,8 @@
 ICFPC2013
 =========
 
+Team name: Functor-static Four
+
 the contest Site: http://icfpc2013.cloudapp.net/
 
 See the wiki pages.
@@ -15,6 +17,8 @@ The members
 -----------
 
 - @nushio (Takayuki Muranushi)
+
+- @tanakh (Hideyuki Tanaka)
 
 - @fumieval (Fumiaki Kinoshita)
 
